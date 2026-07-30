@@ -1,6 +1,5 @@
-<<<<<<< HEAD
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/wGq_UtnU)
-=======
+
 # RevoShop (Backend) 
 > A secure and scalable RESTful online store API e-commerce platform, built with Flask and PostgreSQL  — designed for teams that track work without heavy project management overhead.
 
@@ -139,4 +138,4 @@ curl -X POST http://localhost:5000/tasks \
 Read [CONTRIBUTING.md](./CONTRIBUTING.md) for our pull request process, coding standards, and commit message format.
 ## License
 [MIT](./LICENSE) © 2026 RevoShop Team
->>>>>>> d78a1f6 (docs/create: project overview)
+
