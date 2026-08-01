@@ -41,6 +41,10 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - PostgreSQL running locally (or a connection string to a remote instance)
 - pip and virtualenv
 
+## ERD
+
+![ERD_picture](./docs/ERD.png)
+
 ## Installation
 ```bash
 # 1. Clone the repository
