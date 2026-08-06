@@ -5,7 +5,7 @@
 -- Dumped from database version 14.10 (Homebrew)
 -- Dumped by pg_dump version 14.10 (Homebrew)
 
--- Started on 2026-08-01 22:47:54 JST
+-- Started on 2026-08-06 23:35:53 JST
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -36,10 +36,10 @@ INSERT INTO public.categories VALUES (4, 'komputer', '2026-08-01 20:07:44.282369
 -- Data for Name: products; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO public.products VALUES (1, 'laptop asus', 50, 'asus', '2026-08-01 20:07:33.833666+07', 'laptop dengan batre cepat rusak');
-INSERT INTO public.products VALUES (2, 'laptop lenovo', 150, 'lenovo', '2026-08-01 20:07:33.833666+07', 'terkenal dengan laptop gaming murahnya');
-INSERT INTO public.products VALUES (3, 'laptop surface', 30, 'microsoft', '2026-08-01 20:07:33.833666+07', 'laptop dari sang pembuat os dengan harga lebih mahal dari yang lain');
-INSERT INTO public.products VALUES (4, 'laptop macbook', 50, 'apple', '2026-08-01 20:07:33.833666+07', 'laptop dengan prioritas keamanan yang tinggi');
+INSERT INTO public.products VALUES (1, 'laptop asus', 50, 'asus', '2026-08-01 20:07:33.833666+07', 'laptop dengan batre cepat rusak', 0.00);
+INSERT INTO public.products VALUES (2, 'laptop lenovo', 150, 'lenovo', '2026-08-01 20:07:33.833666+07', 'terkenal dengan laptop gaming murahnya', 0.00);
+INSERT INTO public.products VALUES (3, 'laptop surface', 30, 'microsoft', '2026-08-01 20:07:33.833666+07', 'laptop dari sang pembuat os dengan harga lebih mahal dari yang lain', 0.00);
+INSERT INTO public.products VALUES (4, 'laptop macbook', 50, 'apple', '2026-08-01 20:07:33.833666+07', 'laptop dengan prioritas keamanan yang tinggi', 0.00);
 
 
 --
@@ -71,10 +71,10 @@ INSERT INTO public.users VALUES (3, 'husni@gmail.com', 27, false, 'password', 'e
 -- Data for Name: orders; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO public.orders VALUES (1, 1, 'inv-4229435', 'pending', '2026-08-01 20:11:13.611652+07');
-INSERT INTO public.orders VALUES (2, 2, 'inv-3245435', 'pending', '2026-08-01 20:11:13.611652+07');
-INSERT INTO public.orders VALUES (3, 3, 'inv-4374343', 'pending', '2026-08-01 20:11:13.611652+07');
-INSERT INTO public.orders VALUES (4, 2, 'inv-2938673', 'pending', '2026-08-01 20:11:13.611652+07');
+INSERT INTO public.orders VALUES (1, 1, 'inv-4229435', 'pending', '2026-08-01 20:11:13.611652+07', 1);
+INSERT INTO public.orders VALUES (2, 2, 'inv-3245435', 'pending', '2026-08-01 20:11:13.611652+07', 1);
+INSERT INTO public.orders VALUES (3, 3, 'inv-4374343', 'pending', '2026-08-01 20:11:13.611652+07', 1);
+INSERT INTO public.orders VALUES (4, 2, 'inv-2938673', 'pending', '2026-08-01 20:11:13.611652+07', 1);
 
 
 --
@@ -134,7 +134,7 @@ SELECT pg_catalog.setval('public.products_id_seq', 4, true);
 SELECT pg_catalog.setval('public.users_id_seq', 3, true);
 
 
--- Completed on 2026-08-01 22:47:54 JST
+-- Completed on 2026-08-06 23:35:53 JST
 
 --
 -- PostgreSQL database dump complete
