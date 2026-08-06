@@ -5,7 +5,7 @@
 -- Dumped from database version 14.10 (Homebrew)
 -- Dumped by pg_dump version 14.10 (Homebrew)
 
--- Started on 2026-08-01 22:43:24 JST
+-- Started on 2026-08-06 23:35:15 JST
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -29,7 +29,7 @@ CREATE SCHEMA public;
 ALTER SCHEMA public OWNER TO miftah;
 
 --
--- TOC entry 3662 (class 0 OID 0)
+-- TOC entry 3664 (class 0 OID 0)
 -- Dependencies: 3
 -- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: miftah
 --
@@ -73,7 +73,7 @@ CREATE SEQUENCE public.categories_id_seq
 ALTER TABLE public.categories_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3663 (class 0 OID 0)
+-- TOC entry 3665 (class 0 OID 0)
 -- Dependencies: 213
 -- Name: categories_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -128,7 +128,7 @@ CREATE SEQUENCE public.order_items_id_seq
 ALTER TABLE public.order_items_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3664 (class 0 OID 0)
+-- TOC entry 3666 (class 0 OID 0)
 -- Dependencies: 218
 -- Name: order_items_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -147,6 +147,7 @@ CREATE TABLE public.orders (
     name character varying(150),
     status character varying(50) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
+    total integer DEFAULT 1 NOT NULL,
     CONSTRAINT orders_name_check CHECK ((lower((name)::text) = (name)::text))
 );
 
@@ -170,7 +171,7 @@ CREATE SEQUENCE public.orders_id_seq
 ALTER TABLE public.orders_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3665 (class 0 OID 0)
+-- TOC entry 3667 (class 0 OID 0)
 -- Dependencies: 216
 -- Name: orders_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -190,6 +191,7 @@ CREATE TABLE public.products (
     brand character varying(150) NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     description character varying(1000),
+    price numeric(10,2) DEFAULT 0 NOT NULL,
     CONSTRAINT products_quantity_check CHECK ((quantity >= 0))
 );
 
@@ -213,7 +215,7 @@ CREATE SEQUENCE public.products_id_seq
 ALTER TABLE public.products_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3666 (class 0 OID 0)
+-- TOC entry 3668 (class 0 OID 0)
 -- Dependencies: 211
 -- Name: products_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -256,7 +258,7 @@ CREATE SEQUENCE public.users_id_seq
 ALTER TABLE public.users_id_seq OWNER TO postgres;
 
 --
--- TOC entry 3667 (class 0 OID 0)
+-- TOC entry 3669 (class 0 OID 0)
 -- Dependencies: 209
 -- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -265,7 +267,7 @@ ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
 
 
 --
--- TOC entry 3484 (class 2604 OID 24895)
+-- TOC entry 3485 (class 2604 OID 24895)
 -- Name: categories id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -273,7 +275,7 @@ ALTER TABLE ONLY public.categories ALTER COLUMN id SET DEFAULT nextval('public.c
 
 
 --
--- TOC entry 3492 (class 2604 OID 24939)
+-- TOC entry 3494 (class 2604 OID 24939)
 -- Name: order_items id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -281,7 +283,7 @@ ALTER TABLE ONLY public.order_items ALTER COLUMN id SET DEFAULT nextval('public.
 
 
 --
--- TOC entry 3488 (class 2604 OID 24922)
+-- TOC entry 3489 (class 2604 OID 24922)
 -- Name: orders id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -305,7 +307,7 @@ ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_
 
 
 --
--- TOC entry 3502 (class 2606 OID 24901)
+-- TOC entry 3504 (class 2606 OID 24901)
 -- Name: categories categories_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -314,7 +316,7 @@ ALTER TABLE ONLY public.categories
 
 
 --
--- TOC entry 3504 (class 2606 OID 24899)
+-- TOC entry 3506 (class 2606 OID 24899)
 -- Name: categories categories_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -323,7 +325,7 @@ ALTER TABLE ONLY public.categories
 
 
 --
--- TOC entry 3506 (class 2606 OID 24907)
+-- TOC entry 3508 (class 2606 OID 24907)
 -- Name: category_items category_items_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -332,7 +334,7 @@ ALTER TABLE ONLY public.category_items
 
 
 --
--- TOC entry 3512 (class 2606 OID 24943)
+-- TOC entry 3514 (class 2606 OID 24943)
 -- Name: order_items order_items_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -341,7 +343,7 @@ ALTER TABLE ONLY public.order_items
 
 
 --
--- TOC entry 3508 (class 2606 OID 24929)
+-- TOC entry 3510 (class 2606 OID 24929)
 -- Name: orders orders_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -350,7 +352,7 @@ ALTER TABLE ONLY public.orders
 
 
 --
--- TOC entry 3510 (class 2606 OID 24927)
+-- TOC entry 3512 (class 2606 OID 24927)
 -- Name: orders orders_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -359,7 +361,7 @@ ALTER TABLE ONLY public.orders
 
 
 --
--- TOC entry 3500 (class 2606 OID 24890)
+-- TOC entry 3502 (class 2606 OID 24890)
 -- Name: products products_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -368,7 +370,7 @@ ALTER TABLE ONLY public.products
 
 
 --
--- TOC entry 3496 (class 2606 OID 24880)
+-- TOC entry 3498 (class 2606 OID 24880)
 -- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -377,7 +379,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 3498 (class 2606 OID 24878)
+-- TOC entry 3500 (class 2606 OID 24878)
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -386,7 +388,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 3513 (class 2606 OID 24908)
+-- TOC entry 3515 (class 2606 OID 24908)
 -- Name: category_items category_items_category_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -395,7 +397,7 @@ ALTER TABLE ONLY public.category_items
 
 
 --
--- TOC entry 3514 (class 2606 OID 24913)
+-- TOC entry 3516 (class 2606 OID 24913)
 -- Name: category_items category_items_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -404,7 +406,7 @@ ALTER TABLE ONLY public.category_items
 
 
 --
--- TOC entry 3516 (class 2606 OID 24944)
+-- TOC entry 3518 (class 2606 OID 24944)
 -- Name: order_items order_items_orders_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -413,7 +415,7 @@ ALTER TABLE ONLY public.order_items
 
 
 --
--- TOC entry 3517 (class 2606 OID 24949)
+-- TOC entry 3519 (class 2606 OID 24949)
 -- Name: order_items order_items_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -422,7 +424,7 @@ ALTER TABLE ONLY public.order_items
 
 
 --
--- TOC entry 3515 (class 2606 OID 24930)
+-- TOC entry 3517 (class 2606 OID 24930)
 -- Name: orders orders_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -430,7 +432,7 @@ ALTER TABLE ONLY public.orders
     ADD CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
--- Completed on 2026-08-01 22:43:25 JST
+-- Completed on 2026-08-06 23:35:16 JST
 
 --
 -- PostgreSQL database dump complete
