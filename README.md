@@ -45,6 +45,47 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 
 ![ERD_picture](./docs/ERD.png)
 
+### Project Structure
+
+```text
+.
+├── README.md
+├── app/
+│   ├── __init__.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── category_items_model.py
+│   │   ├── category_model.py
+│   │   ├── order_items_model.py
+│   │   ├── order_model.py
+│   │   ├── product_model.py
+│   │   └── user_model.py
+│   ├── routes/
+│   │   ├── __init__.py
+│   │   └── v1.py
+│   └── services/
+│       ├── __init__.py
+│       └── user_service.py
+├── docs/
+│   ├── ERD.png
+│   ├── queries.sql
+│   ├── requirements.md
+│   ├── schema.sql
+│   └── seed.sql
+├── migrations/
+│   ├── README
+│   ├── alembic.ini
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions/
+│       ├── 37490e1a0463_add_username_and_role_enum_to_users.py
+│       ├── 3ce39395ca90_alter_orders_layout_and_data_types.py
+│       ├── c00af829578d_fix_junction_mapping_to_string.py
+│       └── e5dadb8947a1_convert_order_items_to_pure_many_to_.py
+├── requirements.txt
+└── run.py
+```
+
 ## Installation
 ```bash
 # 1. Clone the repository
@@ -79,12 +120,21 @@ export SECRET_KEY=root
 psql -U postgres -d revoshop_db -f docs/schema.sql
 # Insert seed data into the newly created tables
 psql -U postgres -d revoshop_db -f docs/seed.sql
+
+# 1. Create the migrations folder structure
+flask db init
+
+# 2. Let Alembic scan your files and auto-generate the script
+flask db migrate -m "complete baseline architecture"
+
+# 3. Mark the database as up-to-date WITHOUT running any raw SQL on your Postgres server
+flask db stamp head
 ```
 
 ## Usage
 Start the development server:
 ```bash
-flask run
+flask run --port=8000
 ```
 The API will be available at `http://localhost:5000`.
 Example request — create a new task:
@@ -102,8 +152,9 @@ curl -X POST http://localhost:5000/tasks \
 | Method | Path | Description | Authentication |
 | :--- | :--- | :--- | :---: |
 | <kbd>POST</kbd> | `/api/v1/auth/login` | Authenticate user & get token | None |
-| <kbd>GET</kbd> | `/api/v1/users` | Get list of all users | `Bearer Token` |
-| <kbd>POST</kbd> | `/api/v1/users` | Register a new user | `Bearer Token` |
+| <kbd>GET</kbd> | `/api/v1/users` | Get list of all users | None |
+| <kbd>GET</kbd> | `/api/v1/users/<int:id>` | Get list of all users | None |
+| <kbd>POST</kbd> | `/api/v1/users` | Register a new user | None |
 
 ### 📦 Product Module
 
@@ -111,9 +162,9 @@ curl -X POST http://localhost:5000/tasks \
 | :--- | :--- | :--- | :---: |
 | <kbd>POST</kbd> | `/api/v1/products` | Create a new product | `Bearer Token` |
 | <kbd>GET</kbd> | `/api/v1/products` | List all products | None |
-| <kbd>GET</kbd> | `/api/v1/products/{id}` | Get product details by ID | None |
-| <kbd>PUT</kbd> | `/api/v1/products/{id}` | Update product details | `Bearer Token` |
-| <kbd>DELETE</kbd> | `/api/v1/products/{id}` | Remove a product | `Bearer Token` |
+| <kbd>GET</kbd> | `/api/v1/products/<int:id>` | Get product details by ID | None |
+| <kbd>PUT</kbd> | `/api/v1/products/<int:id>` | Update product details | `Bearer Token` |
+| <kbd>DELETE</kbd> | `/api/v1/products/<int:id>` | Remove a product | `Bearer Token` |
 
 ### 📦 Category Module
 
@@ -121,19 +172,19 @@ curl -X POST http://localhost:5000/tasks \
 | :--- | :--- | :--- | :---: |
 | <kbd>POST</kbd> | `/api/v1/categories` | Create a new category | `Bearer Token` |
 | <kbd>GET</kbd> | `/api/v1/categories` | List all category | None |
-| <kbd>GET</kbd> | `/api/v1/categories/{id}` | Get a specific category along with its products| None |
-| <kbd>PUT</kbd> | `/api/v1/categories/{id}` | Update category  | `Bearer Token` |
-| <kbd>DELETE</kbd> | `/api/v1/categories/{id}` | Remove a category | `Bearer Token` |
+| <kbd>GET</kbd> | `/api/v1/categories/<int:id>` | Get a specific category along with its products| None |
+| <kbd>PUT</kbd> | `/api/v1/categories/<int:id>` | Update category  | `Bearer Token` |
+| <kbd>DELETE</kbd> | `/api/v1/categories/<int:id>` | Remove a category | `Bearer Token` |
 
 ### 📦 Order Module
 
 | Method | Path | Description | Authentication |
 | :--- | :--- | :--- | :---: |
 | <kbd>POST</kbd> | `/api/v1/orders` | Place a new order linked to the logged-in user | `Bearer Token` |
-| <kbd>GET</kbd> | `/api/v1/orders` | List all orders for the current user | None |
-| <kbd>GET</kbd> | `/api/v1/orders/{id}` | View a specific order with its order items and product details | None |
-| <kbd>PUT</kbd> | `/api/v1/orders/{id}` | Update category  | `Bearer Token` |
-| <kbd>DELETE</kbd> | `/api/v1/orders/{id}` | Delete an order | `Bearer Token` |
+| <kbd>GET</kbd> | `/api/v1/orders` | List all orders for the current user | `Bearer Token` |
+| <kbd>GET</kbd> | `/api/v1/orders/<int:id>` | View a specific order with its order items and product details | `Bearer Token` |
+| <kbd>PUT</kbd> | `/api/v1/orders/<int:id>` | Update category  | `Bearer Token` |
+| <kbd>DELETE</kbd> | `/api/v1/orders/<int:id>` | Delete an order | `Bearer Token` |
 
 
 > **Note:** All protected endpoints require a Bearer token in the `Authorization` header. Obtain a token via `POST /auth/login`.
