@@ -149,7 +149,7 @@ curl -X POST http://localhost:5000/tasks \
 
 ### 🧑 User Module
 
-<table style="width: 100%; table-layout: fixed;">
+<table  style="width: 100%; table-layout: fixed; border-collapse: collapse;">
   <tr>
     <th>Method</th>
     <th>Path</th>
@@ -173,7 +173,7 @@ curl -X POST http://localhost:5000/tasks \
   <tr>
     <td colspan=4>
     <p><b>Body</b></p>
-    <p><pre style="width:80%;white-space: pre-wrap; word-break: break-all; margin: 0;"><code>{
+    <p><pre style="=white-space: pre-wrap; word-break: break-all; margin: 0;"><code>{
     "data": [
         {
             "age": 27,
@@ -302,7 +302,7 @@ curl -X POST http://localhost:5000/tasks \
   </tr>
   <tr>
     <td>
-      <kbd>GET</kbd> 
+      <kbd>POST</kbd> 
     </td>
     <td>
       <code>/api/v1/users</code>
@@ -340,12 +340,12 @@ curl -X POST http://localhost:5000/tasks \
   </tr>
 </table>
 
-| Method | Path | Description | Authentication |Authentication |
+<!-- | Method | Path | Description | Authentication |Authentication |
 | :--- | :--- | :--- | :---: | :---: |
 | <kbd>POST</kbd> | `/api/v1/auth/login` | Authenticate user & get token | None | <pre>code</pre> |
 | <kbd>GET</kbd> | `/api/v1/users` | Get list of all users | None |
 | <kbd>GET</kbd> | `/api/v1/users/<int:id>` | Get list of all users | None |
-| <kbd>POST</kbd> | `/api/v1/users` | Register a new user | None |
+| <kbd>POST</kbd> | `/api/v1/users` | Register a new user | None | -->
 
 ### 📦 Product Module
 
