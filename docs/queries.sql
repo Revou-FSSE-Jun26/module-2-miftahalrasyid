@@ -18,6 +18,7 @@ CREATE TABLE products (
     quantity INTEGER CHECK (quantity >= 0) DEFAULT 0,
     brand VARCHAR(150) NOT NULL,
     description VARCHAR(1000),
+    price numeric(10,2) DEFAULT 0 NOT NULL,  
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -41,6 +42,7 @@ CREATE TABLE orders (
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(150) UNIQUE CHECK (lower(name) = name), 
     status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    total integer DEFAULT 1 NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
