@@ -316,7 +316,24 @@ curl -X POST http://localhost:5000/tasks \
   </tr>
   <tr>
     <td colspan=4 >
-    <p><b>Body</b></p>
+    <p><b>Request </b></p>
+    <p><pre style="white-space: pre-wrap; word-break: break-all; margin: 0;"><code>const formdata = new FormData();
+formdata.append("email", "adriana@gmail.com");
+formdata.append("age", "35");
+formdata.append("password", "adriana948");</code>
+<code>
+const requestOptions = {
+  method: "GET",
+  body: formdata,
+  redirect: "follow"
+};</code>
+<code>
+fetch("http://127.0.0.1:8000/api/v1/users", requestOptions)
+  .then((response) => response.text())
+  .then((result) => console.log(result))
+  .catch((error) => console.error(error));
+</code></pre></p>
+    <p><b>Response </b></p>
     <p><pre style="white-space: pre-wrap; word-break: break-all; margin: 0;"><code>{
     "data": {
         "age": 35,
