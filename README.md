@@ -173,7 +173,7 @@ curl -X POST http://localhost:5000/tasks \
   <tr>
     <td colspan=4>
     <p><b>Body</b></p>
-    <p><pre style="=white-space: pre-wrap; word-break: break-all; margin: 0;"><code>{
+    <p><pre style="white-space: pre-wrap; word-break: break-all; margin: 0;"><code>{
     "data": [
         {
             "age": 27,
@@ -279,7 +279,7 @@ curl -X POST http://localhost:5000/tasks \
   <tr>
     <td colspan=4 >
     <p><b>Body</b></p>
-    <p><pre><code>{
+    <p><pre style="white-space: pre-wrap; word-break: break-all; margin: 0;"><code>{
     "data": {
         "age": 27,
         "created_at": "2026-08-01T20:11:02.118738+07:00",
@@ -317,7 +317,7 @@ curl -X POST http://localhost:5000/tasks \
   <tr>
     <td colspan=4 >
     <p><b>Body</b></p>
-    <p><pre><code>{
+    <p><pre style="white-space: pre-wrap; word-break: break-all; margin: 0;"><code>{
     "data": {
         "age": 35,
         "created_at": "2026-08-12T16:33:27.012421+07:00",
