@@ -1,5 +1,5 @@
 import os
-from flask import Flask,jsonify
+from flask import Flask,jsonify,Blueprint
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate 
 from dotenv import load_dotenv
@@ -28,12 +28,17 @@ def create_app():
 
 
     from app.routes import v1_bp # prevent circular import on models
-    app.register_blueprint(v1_bp)
-    
-    # You can still define a quick root home path directly here if you want
-    @app.route('/')
+    api = Blueprint('api', __name__, url_prefix='/api')
+
+    api.register_blueprint(v1_bp)
+
+    @api.route('/')
     def home():
         return 'Welcome to Rovodev Shop api!'
+    
+    app.register_blueprint(api)
+    
+    # You can still define a quick root home path directly here if you want
 
     @app.errorhandler(500)
     def method_not_allowed(error):
