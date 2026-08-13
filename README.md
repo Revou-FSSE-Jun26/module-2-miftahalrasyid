@@ -216,7 +216,7 @@ curl -X POST http://localhost:5000/tasks \
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/users/<int:id>` | Get user detail by ID | None |
 
-##### Response 
+##### Success Response 
 >**Body**
 >```json
 >{
@@ -237,6 +237,16 @@ curl -X POST http://localhost:5000/tasks \
 >    "success": true
 >}
 >```
+##### Error Response 
+>**Body**
+>```json
+>{
+>    "error": "Not Found",
+>    "message": "User is not found",
+>    "status_code": 404,
+>    "success": false
+>}
+>```
 
 ---
 
@@ -251,9 +261,9 @@ curl -X POST http://localhost:5000/tasks \
 > _This endpoint expects a multipart form._
 >
 > **Parameters**
-> * `email` (`string`) — _Required_
-> * `age` (`string`) — _Required_
-> * `password` (`string`) — _Required_
+> * `email` ( _string_ ) — __Required__
+> * `age` ( _string_ ) — __Required__
+> * `password` ( _string_ ) — __Required__
 > 
 >  **Fetch Example**
 >  ```javascript
@@ -274,7 +284,7 @@ curl -X POST http://localhost:5000/tasks \
 >    .catch((error) => console.error(error));
 >  ```
 
-#### Response
+#### Success Response
 >**Body**
 >```json
 >{
@@ -295,7 +305,30 @@ curl -X POST http://localhost:5000/tasks \
 >    "success": true
 >}
 >```
-
+#### Error Response
+>**Body**
+>
+>_Age is not a number_
+>```json
+>{
+>    "message": "'age' must be a valid number",
+>    "success": false
+>}
+>```
+>_Required parameters are not statisfied_
+>```json
+>{
+>    "message": "'email','age',or 'password' is not provided",
+>    "success": false
+>}
+>```
+>_Wrong email format_
+>```json
+>{
+>    "message": "Email format is wrong",
+>    "success": false
+>}
+>```
 
 <!-- | Method | Path | Description | Authentication |Authentication |
 | :--- | :--- | :--- | :---: | :---: |
