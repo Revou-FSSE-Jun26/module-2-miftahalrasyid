@@ -145,6 +145,7 @@ Start the development server:
 flask run --port=8000
 ```
 The API will be available at `http://localhost:8000`.
+
 Example request — Show welcome to Rovodev api:
 ```bash
 curl -X POST http://localhost:8000/api \
