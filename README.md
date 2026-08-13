@@ -144,10 +144,10 @@ Start the development server:
 ```bash
 flask run --port=8000
 ```
-The API will be available at `http://localhost:5000`.
+The API will be available at `http://localhost:8000`.
 Example request — create a new task:
 ```bash
-curl -X POST http://localhost:5000/tasks \
+curl -X POST http://localhost:8000 \
   -H "Authorization: Bearer <your-token>" \
   -H "Content-Type: application/json" \
   -d '{"title": "Write unit tests", "priority": "high"}'
@@ -278,7 +278,7 @@ curl -X POST http://localhost:5000/tasks \
 >    redirect: "follow"
 >  };
 >  
->  fetch("http://127.0.0", requestOptions)
+>  fetch("http://127.0.0.1:8000/api/v1/users", requestOptions)
 >    .then((response) => response.text())
 >    .then((result) => console.log(result))
 >    .catch((error) => console.error(error));
