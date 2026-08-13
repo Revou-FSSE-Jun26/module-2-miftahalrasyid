@@ -1,7 +1,7 @@
 from app import db
 from dataclasses import dataclass
 from sqlalchemy.exc import IntegrityError
-from app.models.user_model import User
+from app.models.user_model import User,UserRole
 import logging
 import hashlib
 from email_validator import validate_email,EmailNotValidError
@@ -35,50 +35,43 @@ def get_user_by(id):
         logging.error(f"Gagal mengambil data user ID {id}: {str(e)}")
         return None
 
-def add_new_users(email,age,password):
+def add_new_users(user_instance):
     """
     Menambah data pengguna baru ke database.
-    Menerapkan error handling untuk mengantisipasi masalah koneksi database.
+    Menerima 'user_instance' berupa objek Model User SQLAlchemy utuh dari Smorest.
     """
-    
-    required_arguments = (email,age,password)
-    has_required_arguments = all(arg is not None for arg in required_arguments)
-    if not has_required_arguments:
-        return ValidationResponse(success=False, message="'email','age',or 'password' is not provided")
+    # 1. Ambil data mentah dari properti objek yang dikirim oleh Smorest Gate
+    email = user_instance.email
+    password = user_instance.password
 
+    # 2. Jalankan fungsi penormalan & validasi internet andalan Anda
     validated_email = normalize_and_validate_email(email)
-    
     if validated_email is None:
         return ValidationResponse(success=False, message="Email format is wrong")
-    try: 
-        validate_age = int(age)
-    except Exception as e:
-        return ValidationResponse(success=False, message="'age' must be a valid number")
     
     try:
+        # 3. Generate data otomatis internal sistem menggunakan kode asli Anda
         username = validated_email.split('@')[0]
-
+        
         hashed_password = hashlib.sha256(password.encode('utf-8')).hexdigest()
 
-        is_active = False  # Akun baru dibuat dengan status tidak aktif terlebih dahulu
+        user_instance.username = username
+        user_instance.email = validated_email
+        user_instance.provider_key = hashed_password      
+        
+        # Bersihkan properti password polos virtual agar tidak mengganggu SQLAlchemy
+        if hasattr(user_instance, 'password'):
+            delattr(user_instance, 'password')
 
-        new_user = User(
-            username=username,
-            email=validated_email,
-            age=validate_age,
-            is_active=is_active,
-            provider_key=hashed_password # Hash SHA-256 disimpan ke kolom provider_key
-        )
-
-        db.session.add(new_user)
+        db.session.add(user_instance)
         db.session.commit()
 
-        return new_user
+        return user_instance 
 
     except IntegrityError as e:
         db.session.rollback()
         
-        # Ambil pesan asli dari driver psycopg2
+        # Ambil pesan asli dari driver database Anda
         error_msg = str(e.orig)
         
         if "users_email_key" in error_msg or "already exists" in error_msg:
@@ -105,7 +98,7 @@ def normalize_and_validate_email(email_input):
 
     username_part, domain_part = email_address.split('@', 1)
 
-    # Normalisasi khusus Gmail
+    # Normalisasi khusus Gmail Anda yang sangat detail
     if domain_part in ['gmail.com', 'googlemail.com']:
         username_part = username_part.split('+')[0]  # Hapus bagian setelah +
         username_part = username_part.replace('.', '') # Hapus semua titik
