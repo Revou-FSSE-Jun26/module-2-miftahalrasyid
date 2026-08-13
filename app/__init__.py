@@ -3,6 +3,7 @@ from flask import Flask,jsonify,Blueprint
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate 
 from dotenv import load_dotenv
+from flask_smorest import Api
 
 load_dotenv()
 
@@ -13,6 +14,21 @@ def create_app():
     
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("SQLALCHEMY_DATABASE_URI")
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # --- 3. Konfigurasi Swagger UI Flask-Smorest ---
+    app.config["API_TITLE"] = "Rovodev Shop API"
+    app.config["API_VERSION"] = "v1"
+    app.config["OPENAPI_VERSION"] = "3.0.3"
+    app.config["OPENAPI_URL_PREFIX"] = "/"
+    
+    # Menentukan URL halaman dokumentasi Swagger Anda
+    app.config["OPENAPI_SWAGGER_UI_PATH"] = "/swagger-ui"
+    
+    # CRITICAL: Menggunakan unpkg CDN versi 4 agar tampilan UI ter-render sempurna & modern
+    app.config["OPENAPI_SWAGGER_UI_URL"] = "https://unpkg.com/swagger-ui-dist@5.32.13/"
+
+    # Inisialisasi Platform Smorest API
+    api = Api(app)
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -27,17 +43,25 @@ def create_app():
         # before setup flask-migrate 
         # db.create_all()
 
+# --- 4. Registrasi Blueprint Smorest (Trik Mencegah Circular Import) ---
+    # Melakukan import blueprint di dalam fungsi setelah db terbentuk
+    from app.routes import product_bp,users_bp,order_bp
+    
+    # Daftarkan blueprint user ke dalam engine Smorest
+    api.register_blueprint(users_bp)
+    api.register_blueprint(product_bp)
+    api.register_blueprint(order_bp)
 
-    from app.routes import v1_bp # prevent circular import on models
-    api = Blueprint('api', __name__, url_prefix='/api')
+    # from app.routes import v1_bp # prevent circular import on models
+    # api = Blueprint('api', __name__, url_prefix='/api')
 
-    api.register_blueprint(v1_bp)
+    # api.register_blueprint(v1_bp)
 
-    @api.route('/')
+    @app.route('/api')
     def home():
         return jsonify("message",'Welcome to Rovodev Shop api!')
     
-    app.register_blueprint(api)
+    # app.register_blueprint(api)
     
     # You can still define a quick root home path directly here if you want
 

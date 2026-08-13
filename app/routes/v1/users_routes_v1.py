@@ -1,43 +1,50 @@
-from flask import Blueprint, jsonify,abort,request
-from app.services import get_all_users,add_new_users,get_user_by,ValidationResponse
-users_bp = Blueprint('users', __name__)
+from flask.views import MethodView
+from flask_smorest import Blueprint, abort
+from app.schemas import UserSchema
+from app.services.user_service import get_all_users,add_new_users,get_user_by,ValidationResponse
+# users_bp = Blueprint('users', __name__)
 
-@users_bp.get('/')
-def get_users():
-    all_users = get_all_users()
-    if not all_users:
-        abort(500, description="Failed fetching data from database.")
-    return jsonify({
-        "success":True,
-        "message": "Users retrieved successfully.",
-        "data":[user.to_dict() for user in all_users]
-    }), 200
+users_bp = Blueprint(
+    'users', 
+    __name__, 
+    url_prefix='/api/v1/users', 
+    description='Operasi Data Pengguna (Users)'
+)
 
-@users_bp.get('/<int:id>')
-def get_user_by_id(id):
-    user_data = get_user_by(id)
-    if not user_data:
-        abort(404, description="User is not found")
-    return jsonify({
-        "success":True,
-        "message": f"User with id={id} is found",
-        "data":user_data.to_dict()
-    }), 200
+@users_bp.route('/')
+class UsersRoot(MethodView):
 
-@users_bp.post('/')
-def register_new_users():
-    email,age,password = (request.form.get('email'),request.form.get('age'),request.form.get('password') )
+    @users_bp.response(200, UserSchema(many=True))
+    def get(self):
+        """Mengambil semua daftar user dari database"""
+        all_users = get_all_users()
+        if all_users is None:
+            abort(500, message="Gagal mengambil data dari database.")
+        return all_users
 
-    result = add_new_users(email=email, age=age, password=password)
+    # location="form" memberi tahu Swagger untuk menyediakan input Multipart Form Data
+    @users_bp.arguments(UserSchema, location="form")
+    @users_bp.response(201, UserSchema)
+    def post(self, user_instance):
+        """Mendaftarkan user baru ke dalam sistem"""
+        # Di sini 'user_instance' sudah otomatis berupa objek Model User SQLAlchemy asli 
+        # yang datanya sudah lengkap dan lolos validasi tipe data awal dari Marshmallow.
+        result = add_new_users(user_instance)
 
-    if isinstance(result, ValidationResponse):
-        return jsonify({
-            "success": result.success,
-            "message": result.message
-        }), 400
-    
-    return jsonify({
-        "success": True,
-        "message": " New user has been created.",
-        "data": result.to_dict()
-    }), 201
+        # Jika service layer mengembalikan kegagalan bisnis (misal email duplikat)
+        if isinstance(result, ValidationResponse):
+            abort(400, message=result.message)
+        
+        # Jika sukses, kembalikan objek User. Smorest otomatis melakukan serialisasi JSON.
+        return result
+
+@users_bp.route('/<int:id>')
+class UserDetail(MethodView):
+
+    @users_bp.response(200, UserSchema)
+    def get(self, id):
+        """Mengambil data detail satu user berdasarkan ID"""
+        user_data = get_user_by(id)
+        if not user_data:
+            abort(404, message="User tidak ditemukan.")
+        return user_data
