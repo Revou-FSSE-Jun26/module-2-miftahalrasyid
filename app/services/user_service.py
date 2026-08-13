@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from app.models.user_model import User
 import logging
 import hashlib
+from email_validator import validate_email,EmailNotValidError
 
 @dataclass
 class ValidationResponse:
@@ -45,11 +46,10 @@ def add_new_users(email,age,password):
     if not has_required_arguments:
         return ValidationResponse(success=False, message="'email','age',or 'password' is not provided")
 
-    if '@' not in email:
-        return ValidationResponse(success=False, message="Email format is wrong")
-
     validated_email = normalize_and_validate_email(email)
-
+    
+    if validated_email is None:
+        return ValidationResponse(success=False, message="Email format is wrong")
     try: 
         validate_age = int(age)
     except Exception as e:
@@ -91,25 +91,31 @@ def add_new_users(email,age,password):
         logging.error(f"Gagal memproses pendaftaran user: {str(e)}")
         return ValidationResponse(success=False, message="An unexpected database error occurred.")
 
-def normalize_and_validate_email(email_address):
+def normalize_and_validate_email(email_input):
     """
     Menormalisasi email untuk mencegah manipulasi alias (terutama Gmail).
     Contoh: 'andrew.twitter+youtube@gmail.com' -> 'andrew@gmail.com'
     """
-    email_address = email_address.strip().lower()
-    
+    if not email_input or not isinstance(email_input, str):
+        return None
+
+    email_address = email_input.strip().lower()
     if '@' not in email_address:
         return None
 
     username_part, domain_part = email_address.split('@', 1)
 
-    # Logika khusus untuk Gmail (gmail.com atau googlemail.com)
+    # Normalisasi khusus Gmail
     if domain_part in ['gmail.com', 'googlemail.com']:
-        # 1. Hapus semua teks setelah tanda plus (+) termasuk plus-nya sendiri
-        username_part = username_part.split('+')[0]
-        # 2. Hapus semua karakter titik (.) di dalam username Gmail
-        username_part = username_part.replace('.', '')
+        username_part = username_part.split('+')[0]  # Hapus bagian setelah +
+        username_part = username_part.replace('.', '') # Hapus semua titik
 
-    # Satukan kembali email yang sudah bersih
     cleaned_email = f"{username_part}@{domain_part}"
-    return cleaned_email
+
+    try:
+        email_info = validate_email(cleaned_email, check_deliverability=True)
+        return email_info.normalized
+        
+    except EmailNotValidError as e:
+        logging.warning(f"Email tidak lolos validasi internet: {cleaned_email}. Alasan: {str(e)}")
+        return None
