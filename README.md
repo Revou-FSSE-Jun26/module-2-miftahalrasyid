@@ -20,7 +20,9 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 
 ## 🔁 Route Handling flow (Flask-Smorest + SQLAlchemy)
 
-Berikut adalah urutan perjalanan data (Request & Response) dari saat klien menembak API hingga data disimpan ke dalam database PostgreSQL:
+Below graph is the data flow (Request & Response) from when the client hit the API to 
+the state when exchanging data with PostgreSql
+
 
 ```mermaid
 
@@ -34,37 +36,33 @@ graph TD
     G <--> E
     E --> H[(PostgreSQL Database)]
 
-    %% 🎨 STRATEGI WARNA MULTI-KUSTOM (VS CODE & GITHUB ALL OK)
+    %% 🎨 dark and light theme strategy (VS CODE & GITHUB ALL OK)
     
-    %% 1. Kelas Warna Merah Muda / Magenta (Untuk Client Request)
-    classDef wadahPink fill:#be6057,stroke:#e0847d,color:#ffffff,stroke-width:2px;
+    classDef pink fill:#be6057,stroke:#e0847d,color:#ffffff,stroke-width:2px;
     
-    %% 2. Kelas Warna Hijau / Toska (Untuk Smorest Blueprint)
-    classDef wadahHijau fill:#2e7d32,stroke:#4caf50,color:#ffffff,stroke-width:2px;
+    classDef green fill:#2e7d32,stroke:#4caf50,color:#ffffff,stroke-width:2px;
     
-    %% 3. Kelas Warna Biru Cerah (Untuk Marshmallow Schema & Services)
-    classDef wadahBiru fill:#0969da,stroke:#58a6ff,color:#ffffff,stroke-width:2px;
+    classDef blue fill:#0969da,stroke:#58a6ff,color:#ffffff,stroke-width:2px;
     
-    %% 4. Kelas Warna Abu Gelap (Untuk Komponen Database)
-    classDef wadahDatabase fill:#4a5568,stroke:#718096,color:#ffffff,stroke-width:1px;
+    classDef gray fill:#4a5568,stroke:#718096,color:#ffffff,stroke-width:1px;
 
-    %% Aplikasikan kelas unik ke masing-masing elemen sesuai keinginan Anda
-    class A wadahPink;       
-    class C wadahHijau;      
-    class D wadahBiru;     
-    class E,H wadahDatabase;     
+    %% Applied the color class to each element 
+    class A pink;       
+    class C green;      
+    class D blue;     
+    class E,H gray;     
 ```
 ## 🔁 migration flow (Flask-migrate + alembic)
 model -> flask alchemy-> flask migrate-> alembic -> sqlalchemy core
 ### 📋 Task & Responsibility
 
-| Komponen Layer | File Lokasi | Tugas Utama |
-| :--- | :--- | :--- |
-| **Smorest API Gate** | `app/routes/v1/` | Managing Routes, HTTP methods (`GET`/`POST`), and Swagger UI Documentation. |
-| **Validation Schema** | `app/schemas.py` | validate input data type, filtering output data, and storing custom error message. |
-| **Data Model & Property** | `app/models/` | define database table and storing virtual attribute (exp: raw password for *hashing*)|
-| **Business Logic Service** | `app/services/` | Handle all the business related logic and execution to database. |
-| **Manage database migration** | `app/migration/` | Handle all the database upgrade and downgrade the database. |
+| Layer Component | File location | Library | Main Task |
+| :--- | :--- | :--- | :--- |
+| **Smorest API Gate** | `app/routes/v1/` | flask-smorest | Managing Routes, HTTP methods (`GET`/`POST`), and Swagger UI Documentation. |
+| **Validation Schema** | `app/schemas.py` | marshmallow_sqlalchemy<br>marshmallow | validate input data type, filtering output data, and storing custom error message. |
+| **Data Model & Property** | `app/models/` | flask<br>flask_sqlalchemy<br>sqlachemy | define database table and storing virtual attribute (exp: raw password for *hashing*)|
+| **Business Logic Service** | `app/services/` | flask | Handle all the business related logic and execution to database. |
+| **Manage database migration** | `app/migration/` | flask<br>flask_sqlalchemy<br>sqlachemy | Handle all the database upgrade and downgrade the database. |
 
 ## Tech Stack
 
