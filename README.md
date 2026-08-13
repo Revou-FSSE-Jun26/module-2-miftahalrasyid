@@ -157,13 +157,13 @@ curl -X POST http://localhost:5000/tasks \
 
 ### 🧑 User Module
 
-### 1. Get All Users
+#### 1. _Get All Users_
 
 | Method | Path | Description | Authentication |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/users` | Get list of all users | None |
  
-> [!note]
+##### Response
 > **Body**
 > ```json
 > {
@@ -210,47 +210,49 @@ curl -X POST http://localhost:5000/tasks \
 
 ---
 
-### 2. Get User Detail By ID
+#### 2. _Get User Detail By ID_
 
 | Method | Path | Description | Authentication |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/users/<int:id>` | Get user detail by ID | None |
 
-#### 📦 Response Body
-```json
-{
-    "data": {
-        "age": 27,
-        "created_at": "2026-08-01T20:11:02.118738+07:00",
-        "email": "budi@gmail.com",
-        "id": 1,
-        "is_active": false,
-        "provider": "password_hash",
-        "provider_key": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
-        "role": [
-            "BUYER"
-        ],
-        "username": "budi"
-    },
-    "message": "User with id=1 is found",
-    "success": true
-}
-```
+##### Response 
+>**Body**
+>```json
+>{
+>    "data": {
+>        "age": 27,
+>        "created_at": "2026-08-01T20:11:02.118738+07:00",
+>        "email": "budi@gmail.com",
+>        "id": 1,
+>        "is_active": false,
+>        "provider": "password_hash",
+>        "provider_key": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+>        "role": [
+>            "BUYER"
+>        ],
+>        "username": "budi"
+>    },
+>    "message": "User with id=1 is found",
+>    "success": true
+>}
+>```
 
 ---
 
-### 3. Create New User
+#### 3. _Create New User_
 
 | Method | Path | Description | Authentication |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/users` | Create new user | None |
 
-#### Request 
+##### Request 
 > [!note]
 > _This endpoint expects a multipart form._
-> * `email` (`string`) — **Required**
-> * `age` (`string`) — **Required**
-> * `password` (`string`) — **Required**
+> **Parameters**
+> * `email` (`string`) — _Required_
+> * `age` (`string`) — _Required_
+> * `password` (`string`) — _Required_
 > 
 >  **Fetch Example**
 >  ```javascript
