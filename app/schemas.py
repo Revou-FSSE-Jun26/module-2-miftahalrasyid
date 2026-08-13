@@ -11,6 +11,9 @@ class UserSchema(SQLAlchemyAutoSchema):
         sqla_session = db.session   # Menggunakan session database Anda
         include_fk = True          # Otomatis mendeteksi Foreign Key jika
 
+    # --- KUNCI PERBAIKAN: Set sebagai dump_only agar tidak ditagih saat POST ---
+    username = ma.fields.Str(dump_only=True)
+    provider_key = ma.fields.Str(dump_only=True)
         # --- KUSTOMISASI PESAN ERROR UNTUK FIELD WAJIB ---
     
     email = ma.fields.Email(
