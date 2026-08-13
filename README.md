@@ -18,6 +18,38 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Users can group their `products` into `categories`
 - Users can place an order through junction table of `order_items` 
 
+## 🔁 Route Handling flow (Flask-Smorest + SQLAlchemy)
+
+Berikut adalah urutan perjalanan data (Request & Response) dari saat klien menembak API hingga data disimpan ke dalam database PostgreSQL:
+
+```mermaid
+graph TD
+    A[Client Request] --> B[Flask framework]
+    B --> C[Smorest Blueprint Route]
+    C --> D[Marshmallow Schema]
+    D <--> E[(SQLAlchemy Models)]
+    D --> F[Routes / Gate Keeper]
+    F <--> G[Services]
+    G <--> E
+    E --> H[(PostgreSQL Database)]
+
+    %% Styling Warna Kotak (Opsional)
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style G fill:#bbf,stroke:#333,stroke-width:2px
+    style D fill:#bbf,stroke:#333,stroke-width:2px
+```
+## 🔁 migration flow (Flask-migrate + alembic)
+model -> flask alchemy-> flask migrate-> alembic -> sqlalchemy core
+### 📋 Task & Responsibility
+
+| Komponen Layer | File Lokasi | Tugas Utama |
+| :--- | :--- | :--- |
+| **Smorest API Gate** | `app/routes/v1/` | Managing Routes, HTTP methods (`GET`/`POST`), and Swagger UI Documentation. |
+| **Validation Schema** | `app/schemas.py` | validate input data type, filtering output data, and storing custom error message. |
+| **Data Model & Property** | `app/models/` | define database table and storing virtual attribute (exp: raw password for *hashing*)|
+| **Business Logic Service** | `app/services/` | Handle all the business related logic and execution to database. |
+| **Manage database migration** | `app/migration/` | Handle all the database upgrade and downgrade the database. |
+
 ## Tech Stack
 
 - *Core Backend & Framework*
