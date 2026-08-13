@@ -246,50 +246,52 @@ curl -X POST http://localhost:5000/tasks \
 | `POST` | `/api/v1/users` | Create new user | None |
 
 #### Request 
-_This endpoint expects a multipart form._
-* `email` (`string`) — **Required**
-* `age` (`string`) — **Required**
-* `password` (`string`) — **Required**
-
- **Code Example**
- ```javascript
- const formdata = new FormData();
- formdata.append("email", "adriana@gmail.com");
- formdata.append("age", "35");
- formdata.append("password", "adriana948");
- 
- const requestOptions = {
-   method: "GET",
-   body: formdata,
-   redirect: "follow"
- };
- 
- fetch("http://127.0.0", requestOptions)
-   .then((response) => response.text())
-   .then((result) => console.log(result))
-   .catch((error) => console.error(error));
- ```
+> [!note]
+> _This endpoint expects a multipart form._
+> * `email` (`string`) — **Required**
+> * `age` (`string`) — **Required**
+> * `password` (`string`) — **Required**
+> 
+>  **Fetch Example**
+>  ```javascript
+>  const formdata = new FormData();
+>  formdata.append("email", "adriana@gmail.com");
+>  formdata.append("age", "35");
+>  formdata.append("password", "adriana948");
+>  
+>  const requestOptions = {
+>    method: "GET",
+>    body: formdata,
+>    redirect: "follow"
+>  };
+>  
+>  fetch("http://127.0.0", requestOptions)
+>    .then((response) => response.text())
+>    .then((result) => console.log(result))
+>    .catch((error) => console.error(error));
+>  ```
 
 #### Response
-```json
-{
-    "data": {
-        "age": 35,
-        "created_at": "2026-08-12T16:33:27.012421+07:00",
-        "email": "adriana@gmail.com",
-        "id": 12,
-        "is_active": false,
-        "provider": "password_hash",
-        "provider_key": "f96354dd9b0cb206ba156f52be94e4cdfebad293e834fd8276643942d9e6b83f",
-        "role": [
-            "BUYER"
-        ],
-        "username": "adriana"
-    },
-    "message": " New user has been created.",
-    "success": true
-}
-```
+>**Body**
+>```json
+>{
+>    "data": {
+>        "age": 35,
+>        "created_at": "2026-08-12T16:33:27.012421+07:00",
+>        "email": "adriana@gmail.com",
+>        "id": 12,
+>        "is_active": false,
+>        "provider": "password_hash",
+>        "provider_key": "f96354dd9b0cb206ba156f52be94e4cdfebad293e834fd8276643942d9e6b83f",
+>        "role": [
+>            "BUYER"
+>        ],
+>        "username": "adriana"
+>    },
+>    "message": " New user has been created.",
+>    "success": true
+>}
+>```
 
 
 <!-- | Method | Path | Description | Authentication |Authentication |
