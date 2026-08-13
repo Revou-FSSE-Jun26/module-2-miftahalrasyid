@@ -24,7 +24,8 @@ def create_app():
             print("Database connection: OK")
         except Exception as e:
             print(f"Connection failed: {e}")
-        db.create_all()
+        # before setup flask-migrate 
+        # db.create_all()
 
 
     from app.routes import v1_bp # prevent circular import on models
