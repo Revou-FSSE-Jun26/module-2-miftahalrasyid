@@ -23,6 +23,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 Berikut adalah urutan perjalanan data (Request & Response) dari saat klien menembak API hingga data disimpan ke dalam database PostgreSQL:
 
 ```mermaid
+
 graph TD
     A[Client Request] --> B[Flask framework]
     B --> C[Smorest Blueprint Route]
@@ -33,10 +34,25 @@ graph TD
     G <--> E
     E --> H[(PostgreSQL Database)]
 
-    %% Styling Warna Kotak (Opsional)
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-    style G fill:#bbf,stroke:#333,stroke-width:2px
-    style D fill:#bbf,stroke:#333,stroke-width:2px
+    %% 🎨 STRATEGI WARNA MULTI-KUSTOM (VS CODE & GITHUB ALL OK)
+    
+    %% 1. Kelas Warna Merah Muda / Magenta (Untuk Client Request)
+    classDef wadahPink fill:#be6057,stroke:#e0847d,color:#ffffff,stroke-width:2px;
+    
+    %% 2. Kelas Warna Hijau / Toska (Untuk Smorest Blueprint)
+    classDef wadahHijau fill:#2e7d32,stroke:#4caf50,color:#ffffff,stroke-width:2px;
+    
+    %% 3. Kelas Warna Biru Cerah (Untuk Marshmallow Schema & Services)
+    classDef wadahBiru fill:#0969da,stroke:#58a6ff,color:#ffffff,stroke-width:2px;
+    
+    %% 4. Kelas Warna Abu Gelap (Untuk Komponen Database)
+    classDef wadahDatabase fill:#4a5568,stroke:#718096,color:#ffffff,stroke-width:1px;
+
+    %% Aplikasikan kelas unik ke masing-masing elemen sesuai keinginan Anda
+    class A wadahPink;       
+    class C wadahHijau;      
+    class D wadahBiru;     
+    class E,H wadahDatabase;     
 ```
 ## 🔁 migration flow (Flask-migrate + alembic)
 model -> flask alchemy-> flask migrate-> alembic -> sqlalchemy core
