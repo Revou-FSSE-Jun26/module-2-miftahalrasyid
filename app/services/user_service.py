@@ -42,7 +42,6 @@ def add_new_users(user_instance):
     """
     # 1. Ambil data mentah dari properti objek yang dikirim oleh Smorest Gate
     email = user_instance.email
-    password = user_instance.password
 
     # 2. Jalankan fungsi penormalan & validasi internet andalan Anda
     validated_email = normalize_and_validate_email(email)
@@ -52,16 +51,9 @@ def add_new_users(user_instance):
     try:
         # 3. Generate data otomatis internal sistem menggunakan kode asli Anda
         username = validated_email.split('@')[0]
-        
-        hashed_password = hashlib.sha256(password.encode('utf-8')).hexdigest()
 
         user_instance.username = username
-        user_instance.email = validated_email
-        user_instance.provider_key = hashed_password      
-        
-        # Bersihkan properti password polos virtual agar tidak mengganggu SQLAlchemy
-        if hasattr(user_instance, 'password'):
-            delattr(user_instance, 'password')
+        user_instance.email = validated_email   
 
         db.session.add(user_instance)
         db.session.commit()
