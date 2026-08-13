@@ -28,7 +28,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
     - **Database Engine:** PostgreSQL 16
     - **ORM:** SQLAlchemy (Flask-SQLAlchemy)
     - **Migrations:** Flask-Migrate
-    - **Database Management:** pgAdmin 4
+    - **Database Management:** Dbeaver 22.0.2
 - *Testing & Performance*
     - **Unit & Integration Testing:** pytest + pytest-flask
     - **Load & Performance Testing:** Locust
@@ -48,7 +48,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 ### Project Structure
 
 ```text
-.
+./
 ├── README.md
 ├── app/
 │   ├── __init__.py
@@ -62,7 +62,12 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 │   │   └── user_model.py
 │   ├── routes/
 │   │   ├── __init__.py
-│   │   └── v1.py
+│   │   └── v1/
+│   │       ├── __init__.py
+│   │       ├── auth_routes_v1.py
+│   │       ├── orders_routes_v1.py
+│   │       ├── product_routes_v1.py
+│   │       └── users_routes_v1.py
 │   └── services/
 │       ├── __init__.py
 │       └── user_service.py
@@ -91,25 +96,28 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 # 1. Clone the repository
 git clone https://github.com/Revou-FSSE-Jun26/module-2-miftahalrasyid.git
 cd module-2-miftahalrasyid
+
 # 2. Create and activate a virtual environment
 python -m venv venv
-source venv/bin/activate        # Windows: venvScriptsactivate
+source venv/bin/activate       
+ # Windows: venvScriptsactivate
+
 # 3. Install dependencies
 pip install -r requirements.txt
-# install postgresql dari homebrew
+# install postgresql 
 brew install postgresql
-# nyalakan postgres
+# turn on postgres service
 brew services start postgresql
-# masuk terminal postgres
+# enter postgres terminal
 psql postgres
 # alter user posgres
 ALTER USER postgres WITH PASSWORD 'root';
-# jika error lakukan yang dibawah
+# in case of error, run next code
 # set login superuser for postgres
 CREATE ROLE postgres WITH LOGIN SUPERUSER PASSWORD 'root';
-# keluar postgres
+# quit postgres
 \q
-# buat database revoshop_db
+# create revoshop_db
 createdb -U postgres revoshop_db
 
 # 4. Set environment variables
@@ -314,9 +322,31 @@ curl -X POST http://localhost:5000/tasks \
       None
     </td>
   </tr>
+  <style>
+    .red{
+      font-size:14px;
+      color:#be6057
+    }
+    .gray{
+      font-size:14px;
+      color:#adacab;
+    }
+    .spacer{
+      height: 1px;
+      margin-top:.7rem;
+      margin-bottom:.7rem;
+    }
+  </style>
   <tr>
     <td colspan=4 >
     <p><b>Request </b></p>
+<div>This endpoint expects a multipart form.</div>
+<hr class="spacer">
+<div >email <span class="gray">string</span> <span class="red">Required</span></div>
+<hr class="spacer">
+<div >age <span class="gray">string</span> <span class="red">Required</span></div>
+<hr class="spacer">
+<div >password <span class="gray">string</span> <span class="red">Required</span></div>
     <p><pre style="white-space: pre-wrap; word-break: break-all; margin: 0;"><code>const formdata = new FormData();
 formdata.append("email", "adriana@gmail.com");
 formdata.append("age", "35");
