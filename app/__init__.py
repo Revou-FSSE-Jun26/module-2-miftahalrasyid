@@ -34,7 +34,7 @@ def create_app():
 
     @api.route('/')
     def home():
-        return 'Welcome to Rovodev Shop api!'
+        return jsonify("message",'Welcome to Rovodev Shop api!')
     
     app.register_blueprint(api)
     

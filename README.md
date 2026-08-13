@@ -145,9 +145,9 @@ Start the development server:
 flask run --port=8000
 ```
 The API will be available at `http://localhost:8000`.
-Example request — create a new task:
+Example request — Show welcome to Rovodev api:
 ```bash
-curl -X POST http://localhost:8000 \
+curl -X POST http://localhost:8000/api \
   -H "Authorization: Bearer <your-token>" \
   -H "Content-Type: application/json" \
   -d '{"title": "Write unit tests", "priority": "high"}'
