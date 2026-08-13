@@ -9,6 +9,7 @@ load_dotenv()
 
 db = SQLAlchemy()
 migrate = Migrate()
+
 def create_app():
     app = Flask(__name__)
     
@@ -27,9 +28,10 @@ def create_app():
     # CRITICAL: Menggunakan unpkg CDN versi 4 agar tampilan UI ter-render sempurna & modern
     app.config["OPENAPI_SWAGGER_UI_URL"] = "https://unpkg.com/swagger-ui-dist@5.32.13/"
 
+
     # Inisialisasi Platform Smorest API
     api = Api(app)
-
+    api.DEFAULT_ERROR_RESPONSE_NAME = None 
     db.init_app(app)
     migrate.init_app(app, db)
     # CRUCIAL: Import all separate files here so Alembic detects them!
@@ -65,39 +67,40 @@ def create_app():
     
     # You can still define a quick root home path directly here if you want
 
-    @app.errorhandler(500)
-    def method_not_allowed(error):
-        return jsonify({
-            "success": False,
-            "error": "Method Not Allowed",
-            "message": error.description,
-            "status_code": 500
-        }), 500
+    # @app.errorhandler(500)
+    # def method_not_allowed(error):
+    #     return jsonify({
+    #         "success": False,
+    #         "error": "Method Not Allowed",
+    #         "message": error.description,
+    #         "status_code": 500
+    #     }), 500
     
-    @app.errorhandler(400)
-    def method_not_allowed(error):
-        return jsonify({
-            "success": False,
-            "error": "Bad Request",
-            "message": error.description,
-            "status_code": 400
-        }), 400
-    @app.errorhandler(405)
-    def method_not_allowed(error):
-        return jsonify({
-            "success": False,
-            "error": "Method Not Allowed",
-            "message": "The HTTP method used is not supported for this endpoint.",
-            "status_code": 405
-        }), 405
+    # @app.errorhandler(400)
+    # def method_not_allowed(error):
+    #     print("error miftah",error)
+    #     return jsonify({
+    #         "success": False,
+    #         "error": "Bad Request",
+    #         "message": error.message,
+    #         "status_code": 400
+    #     }), 400
+    # @app.errorhandler(405)
+    # def method_not_allowed(error):
+    #     return jsonify({
+    #         "success": False,
+    #         "error": "Method Not Allowed",
+    #         "message": "The HTTP method used is not supported for this endpoint.",
+    #         "status_code": 405
+    #     }), 405
 
-    @app.errorhandler(404)
-    def page_not_found(error):
-        return jsonify({
-            "success": False,
-            "error": "Not Found",
-            "message": error.description,
-            "status_code": 404
-        }), 404
+    # @app.errorhandler(404)
+    # def page_not_found(error):
+    #     return jsonify({
+    #         "success": False,
+    #         "error": "Not Found",
+    #         "message": error.description,
+    #         "status_code": 404
+    #     }), 404
         
     return app
