@@ -18,57 +18,6 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Users can group their `products` into `categories`
 - Users can place an order through junction table of `order_items` 
 
-## 🔁 Route Handling flow (Flask-Smorest + SQLAlchemy)
-
-Below graph is the data flow (Request & Response) from when the client hit the API to 
-the state when exchanging data with PostgreSql
-
-
-```mermaid
-
-graph TD
-    A[Client Request] --> B[Flask framework]
-    B --> C[Smorest Blueprint Route]
-    C --> D[Marshmallow Schema]
-    D <--> E[(SQLAlchemy Models)]
-    D --> F[Routes / Gate Keeper]
-    F <--> G[Services]
-    G <--> E
-    E --> H[(PostgreSQL Database)]
-
-    %% 🎨 dark and light theme strategy (VS CODE & GITHUB ALL OK)
-    
-    classDef pink fill:#be6057,stroke:#e0847d,color:#ffffff,stroke-width:2px;
-    
-    classDef green fill:#2e7d32,stroke:#4caf50,color:#ffffff,stroke-width:2px;
-    
-    classDef blue fill:#0969da,stroke:#58a6ff,color:#ffffff,stroke-width:2px;
-    
-    classDef gray fill:#4a5568,stroke:#718096,color:#ffffff,stroke-width:1px;
-
-    %% Applied the color class to each element 
-    class A pink;       
-    class C green;      
-    class D blue;     
-    class E,H gray;     
-```
-## 🔁 migration flow (Flask-migrate + alembic)
-model -> flask alchemy-> flask migrate-> alembic -> sqlalchemy core
-
-### 📋 Task & Responsibility
-
-| Layer Component | File location | Library | Main Task |
-| :--- | :--- | :--- | :--- |
-| **Smorest API Gate** | `app/routes/v1/` | flask-smorest | Managing Routes, HTTP methods (`GET`/`POST`), and Swagger UI Documentation. |
-| **Validation Schema** | `app/schemas.py` | marshmallow_sqlalchemy<br>marshmallow | validate input data type, filtering output data, and storing custom error message. |
-| **Data Model & Property** | `app/models/` | flask<br>flask_sqlalchemy<br>sqlachemy | define database table and storing virtual attribute (exp: raw password for *hashing*)|
-| **Business Logic Service** | `app/services/` | flask | Handle all the business related logic and execution to database. |
-| **Manage database migration** | `app/migration/` | flask<br>flask_sqlalchemy<br>sqlachemy | Handle all the database upgrade and downgrade the database. |
-
-## Step-by-Step Guide: Implementing Features in Isolation 
->Creating new feature (endpoint: GET,POST) steps using (Flask-Smorest x marsmallow x flask-sqlalchemy x marsmallow-sqlalchemy) route stack
-
-__sqlalchemy__(create new models)->__schemas__(map sqlalchemy to marsmallow) -> __service__(create business logic in total isolation with flask-smorest blueprint)->[__app.routes__(register new routes to the services) -> __app.init__(apply the routes to the root api blueprint)]
 
 ## Tech Stack
 
@@ -160,6 +109,154 @@ erDiagram
     users ||--o{ orders : "places"
 ```
 
+## 🔁 Route Handling flow (Flask-Smorest + SQLAlchemy)
+
+Below graph is the data flow (Request & Response) from when the client hit the API to 
+the state when exchanging data with PostgreSql
+
+
+```mermaid
+
+graph TD
+    A[Client Request] --> B[Flask framework]
+    B --> C[Smorest Blueprint Route]
+    C --> D[Marshmallow Schema]
+    D <--> E[(SQLAlchemy Models)]
+    D --> F[Routes / Gate Keeper]
+    F <--> G[Services]
+    G <--> E
+    E <--> H[(PostgreSQL Database)]
+
+    %% 🎨 dark and light theme strategy (VS CODE & GITHUB ALL OK)
+    
+    classDef pink fill:#be6057,stroke:#e0847d,color:#ffffff,stroke-width:2px;
+    
+    classDef green fill:#2e7d32,stroke:#4caf50,color:#ffffff,stroke-width:2px;
+    
+    classDef blue fill:#0969da,stroke:#58a6ff,color:#ffffff,stroke-width:2px;
+    
+    classDef gray fill:#4a5568,stroke:#718096,color:#ffffff,stroke-width:1px;
+
+    %% Applied the color class to each element 
+    class A pink;       
+    class C green;      
+    class D blue;     
+    class E,H gray;     
+```
+## 🔁 migration flow (Flask-migrate + alembic)
+model -> flask alchemy-> flask migrate-> alembic -> sqlalchemy core
+
+### 📋 Task & Responsibility
+
+| Layer Component | File location | Library | Main Task |
+| :--- | :--- | :--- | :--- |
+| **Smorest API Gate** | `app/routes/v1/*.py` | flask-smorest | Managing Routes, HTTP methods (`GET`/`POST`), and Swagger UI Documentation. |
+| **Validation Schema** | `app/schemas/*.py` | marshmallow_sqlalchemy<br>marshmallow | validate input data type, filtering output data, and storing custom error message. |
+| **Data Model & Property** | `app/models/*.py` | flask<br>flask_sqlalchemy<br>sqlachemy | define database table and storing virtual attribute (exp: raw password for *hashing*)|
+| **Business Logic Service** | `app/services/*.py` | flask | Handle all the business related logic and execution to database. |
+| **Manage database migration** | `app/migration/*.py` | flask<br>flask_sqlalchemy<br>sqlachemy | Handle all the database upgrade and downgrade the database. |
+
+
+## Installation
+### 1. Clone & Setup Environment
+Clone repositori, buat dan aktifkan *virtual environment*, serta install dependencies:
+```bash
+git clone https://github.com
+cd module-2-miftahalrasyid
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### install postgresql 
+Skip install if you already have postgresql
+```bash
+brew install postgresql
+brew services start postgresql
+psql postgres
+# alter user posgres
+ALTER USER postgres WITH PASSWORD 'password';
+# in case of error, run next code
+CREATE ROLE postgres WITH LOGIN SUPERUSER PASSWORD 'password';
+# quit postgres
+\q
+```
+### 2. Configure Local PostgreSQL Database
+Buat database baru di PostgreSQL:
+```bash
+# create revoshop_db
+createdb -U postgres revoshop_db
+```
+*(Alternatif via psql: `psql -U postgres`, lalu ketik `CREATE DATABASE revoshop_db;` dan `\q`).*
+
+### 3. Setup Environment Variables (.env)
+Buat file `.env` di root direktori:
+```env
+SQLALCHEMY_DATABASE_URI=postgresql://postgres:root@localhost:5432/revoshop_db
+SECRET_KEY=root_secret_key_anda
+FLASK_APP=run.py
+FLASK_DEBUG=1
+```
+
+### 4. Database Migration, & Seeding
+Jalankan migrasi, *seeding*, dan server lokal:
+```bash
+flask db upgrade
+python app/seeds/initial_seed.py
+```
+
+## Usage
+Start the development server:
+```bash
+flask run --port=8000
+```
+The API will be available at `http://localhost:8000`.
+
+Example request — Show welcome to Rovodev api:
+```bash
+curl -X POST http://localhost:8000/api \
+  -H "Authorization: Bearer <your-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Write unit tests", "priority": "high"}'
+```
+
+Akses dokumentasi Swagger UI di **[http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)**.
+
+## Seeding process
+
+### Adding initial admin user
+
+## Step-by-Step Guide: Implementing HTML Request Features in Isolation 
+>Creating new feature (endpoint: GET,POST) steps using (Flask-Smorest x marsmallow x flask-sqlalchemy x marsmallow-sqlalchemy) route stack
+
+
+```mermaid
+flowchart TD
+    %% Struktur luar diatur TD (Top-Down) agar kelompok Flask berada di bawah
+    %% classDef step fill:#2d3748,stroke:#4a5568,stroke-width:2px,color:#fff;
+
+    subgraph Isolation_Layer ["Isolation Layer"]
+        direction LR
+        A["<b>1. models.py</b><br>Create SQLAlchemy Models"]:::step 
+        --> B["<b>2. schemas.py</b><br>Map Models to Marshmallow"]:::step
+        --> C["<b>3. services.py</b><br>Write Pure Business Logic"]:::step
+    end
+
+    subgraph Flask_Registration ["Flask Registration"]
+        direction LR
+        D["<b>4. routes.py</b><br>Connect HTTP Routes to Services"]:::step 
+        --> E["<b>5. __init__.py (App Factory)</b><br>Register Blueprints to Core API"]:::step
+    end
+
+    %% KUNCI: Hubungkan Subgraph langsung ke Subgraph agar panahnya vertikal ke bawah
+    Isolation_Layer -->|Establish Connection to Flask| Flask_Registration
+
+    %% Subgraph styling
+    %% style Isolation_Layer fill:#202632,stroke:#4a5568,stroke-width:1px
+    %% style Flask_Registration fill:#1a202c,stroke:#4a5568,stroke-width:1px
+
+```
+
 ### Project Structure
 
 ```text
@@ -183,11 +280,18 @@ erDiagram
 │   │       ├── orders_routes_v1.py
 │   │       ├── product_routes_v1.py
 │   │       └── users_routes_v1.py
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   ├── category_schema.py
+│   │   ├── order_schema.py
+│   │   ├── product_schema.py
+│   │   └── user_schema.py
+│   ├── seeds/
+│   │   └── initial_seed.py
 │   └── services/
 │       ├── __init__.py
 │       └── user_service.py
 ├── docs/
-│   ├── ERD.png
 │   ├── queries.sql
 │   ├── requirements.md
 │   ├── schema.sql
@@ -201,73 +305,12 @@ erDiagram
 │       ├── 37490e1a0463_add_username_and_role_enum_to_users.py
 │       ├── 3ce39395ca90_alter_orders_layout_and_data_types.py
 │       ├── c00af829578d_fix_junction_mapping_to_string.py
-│       └── e5dadb8947a1_convert_order_items_to_pure_many_to_.py
+│       ├── e5dadb8947a1_convert_order_items_to_pure_many_to_.py
+│       └── fb1b2de14c14_add_deleted_at_on_user.py
 ├── requirements.txt
 └── run.py
 ```
 
-## Installation
-```bash
-# 1. Clone the repository
-git clone https://github.com/Revou-FSSE-Jun26/module-2-miftahalrasyid.git
-cd module-2-miftahalrasyid
-
-# 2. Create and activate a virtual environment
-python -m venv venv
-source venv/bin/activate       
- # Windows: venvScriptsactivate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-# install postgresql 
-brew install postgresql
-# turn on postgres service
-brew services start postgresql
-# enter postgres terminal
-psql postgres
-# alter user posgres
-ALTER USER postgres WITH PASSWORD 'root';
-# in case of error, run next code
-# set login superuser for postgres
-CREATE ROLE postgres WITH LOGIN SUPERUSER PASSWORD 'root';
-# quit postgres
-\q
-# create revoshop_db
-createdb -U postgres revoshop_db
-
-# 4. Set environment variables
-export DATABASE_URL=postgresql://postgres:root@localhost/revoshop_db
-export SECRET_KEY=root
-
-# Build the tables using manual postgresql file
-psql -U postgres -d revoshop_db -f docs/schema.sql
-# Insert seed data into the newly created tables
-psql -U postgres -d revoshop_db -f docs/seed.sql
-
-# 1. Create the migrations folder structure
-flask db init
-
-# 2. Let Alembic scan your files and auto-generate the script
-flask db migrate -m "complete baseline architecture"
-
-# 3. Mark the database as up-to-date WITHOUT running any raw SQL on your Postgres server
-flask db stamp head
-```
-
-## Usage
-Start the development server:
-```bash
-flask run --port=8000
-```
-The API will be available at `http://localhost:8000`.
-
-Example request — Show welcome to Rovodev api:
-```bash
-curl -X POST http://localhost:8000/api \
-  -H "Authorization: Bearer <your-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Write unit tests", "priority": "high"}'
-```
 
 ## API Reference
 
