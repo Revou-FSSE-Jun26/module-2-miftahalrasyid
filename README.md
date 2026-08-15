@@ -54,6 +54,7 @@ graph TD
 ```
 ## 🔁 migration flow (Flask-migrate + alembic)
 model -> flask alchemy-> flask migrate-> alembic -> sqlalchemy core
+
 ### 📋 Task & Responsibility
 
 | Layer Component | File location | Library | Main Task |
@@ -63,6 +64,11 @@ model -> flask alchemy-> flask migrate-> alembic -> sqlalchemy core
 | **Data Model & Property** | `app/models/` | flask<br>flask_sqlalchemy<br>sqlachemy | define database table and storing virtual attribute (exp: raw password for *hashing*)|
 | **Business Logic Service** | `app/services/` | flask | Handle all the business related logic and execution to database. |
 | **Manage database migration** | `app/migration/` | flask<br>flask_sqlalchemy<br>sqlachemy | Handle all the database upgrade and downgrade the database. |
+
+## Step-by-Step Guide: Implementing Features in Isolation 
+>Creating new feature (endpoint: GET,POST) steps using (Flask-Smorest x marsmallow x flask-sqlalchemy x marsmallow-sqlalchemy) route stack
+
+__sqlalchemy__(create new models)->__schemas__(map sqlalchemy to marsmallow) -> __service__(create business logic in total isolation with flask-smorest blueprint)->[__app.routes__(register new routes to the services) -> __app.init__(apply the routes to the root api blueprint)]
 
 ## Tech Stack
 
@@ -89,7 +95,70 @@ model -> flask alchemy-> flask migrate-> alembic -> sqlalchemy core
 
 ## ERD
 
-![ERD_picture](./docs/ERD.png)
+```mermaid
+erDiagram
+    categories {
+        int id PK
+        string name
+        datetime created_at
+    }
+
+    category_items {
+        int category_id FK
+        int product_id FK
+        datetime created_at
+    }
+
+    products {
+        int id PK
+        string name
+        int quantity
+        string brand
+        datetime created_at
+        string description
+        int price
+        int user_id FK
+    }
+
+    order_items {
+        int order_id FK
+        int product_id FK
+        datetime created_at
+    }
+
+    orders {
+        int id PK
+        int user_id FK
+        string name
+        string status
+        datetime created_at
+        int total
+    }
+
+    users {
+        int id PK
+        string email
+        int age
+        boolean is_active
+        string provider
+        string provider_key
+        datetime created_at
+        string username
+        string role
+        datetime deleted_at
+    }
+
+    alembic_version {
+        string version_num PK
+    }
+
+    categories ||--o{ category_items : "has"
+    products ||--o{ category_items : "belongs to"
+    products ||--o{ order_items : "included in"
+    orders ||--o{ order_items : "contains"
+    users ||--o{ products : "creates"
+    users ||--o{ orders : "places"
+```
 
 ### Project Structure
 
