@@ -23,6 +23,7 @@ class User(db.Model):
     provider = db.Column(db.String(50), nullable=False, default='password_hash')
     provider_key = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
+    deleted_at = db.Column(db.DateTime(timezone=True))
 
     @property
     def password(self):
