@@ -1,6 +1,7 @@
 from app import db
 from dataclasses import dataclass
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 from app.models.user_model import User,UserRole
 import logging
 import hashlib
@@ -17,7 +18,7 @@ def get_all_users():
     Menerapkan error handling untuk mengantisipasi masalah koneksi database.
     """
     try:
-        users = db.session.query(User).all()
+        users = db.session.query(User).filter(User.deleted_at.is_(None)).all()
         return users
     except Exception as e:
         logging.error(f"Gagal mengambil data users: {str(e)}")
@@ -34,6 +35,47 @@ def get_user_by(id):
     except Exception as e:
         logging.error(f"Gagal mengambil data user ID {id}: {str(e)}")
         return None
+
+def delete_user_by(id):
+    """
+    delete user
+    """
+    try:
+        user = User.query.get(id)
+        if user is None:
+            return ValidationResponse(success=False, message= "User tidak ditemukan")
+            
+        if user.deleted_at is None:
+            user.deleted_at = func.now()
+            db.session.commit()
+            return user
+        else:
+            # Opsional: Beri tahu jika user sebenarnya sudah dalam kondisi terhapus
+            return ValidationResponse(success=False,message= "User sudah dihapus sebelumnya")
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"unexpected error delete on id:{id}: {str(e)}")
+        return ValidationResponse(success=False,message="unexpected error delete")
+
+def update_user_by(id,user_instance):
+    """
+    update age or password by id
+    """
+    try:
+        user = User.query.get(id)
+        if user is None:
+            return ValidationResponse(success=False, message= "User tidak ditemukan")
+        if getattr(user_instance, 'age', None) is not None and user_instance.age != "":
+            user.age = user_instance.age
+        new_hash_password = getattr(user_instance, 'provider_key', None)
+        if new_hash_password is not None and new_hash_password != "":
+            user.provider_key = new_hash_password
+        db.session.commit()
+        return user
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"unexpected error delete on id:{id}: {str(e)}")
+        return ValidationResponse(success=False,message=f"unexpected error update on id:{id}")
 
 def add_new_users(user_instance):
     """
