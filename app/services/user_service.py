@@ -1,127 +1,209 @@
-from app import db
+from app.extensions import db
 from dataclasses import dataclass
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
-from app.models.user_model import User,UserRole
+from app.models.user_model import User, UserRole, AuthProvider
 import logging
 import hashlib
-from email_validator import validate_email,EmailNotValidError
+from email_validator import validate_email, EmailNotValidError
+from . import ValidationResponse
 
-@dataclass
-class ValidationResponse:
-    success: bool
-    message: str
 
 def get_all_users():
     """
-    Mengambil semua data pengguna dari database.
-    Menerapkan error handling untuk mengantisipasi masalah koneksi database.
+    Retrieve all users from the database where deleted_at is None.
+    Includes error handling for database connection issues.
     """
     try:
-        users = db.session.query(User).filter(User.deleted_at.is_(None)).all()
-        return users
+        users = User.query.filter(User.deleted_at.is_(None)).all()
+        return [user.to_dict() for user in users]
     except Exception as e:
-        logging.error(f"Gagal mengambil data users: {str(e)}")
+        logging.error(f"Failed to retrieve users: {str(e)}")
         return None
+
 
 def get_user_by(id):
     """
-        Mengambil data pengguna melalui id.
-        Menerapkan error handling untuk mengantisipasi masalah koneksi database.
+    Retrieve a single user by ID.
+    Includes error handling for database connection issues.
     """
     try:
         user = db.session.query(User).get(id)
         return user
     except Exception as e:
-        logging.error(f"Gagal mengambil data user ID {id}: {str(e)}")
+        logging.error(f"Failed to retrieve user ID {id}: {str(e)}")
         return None
+
 
 def delete_user_by(id):
     """
-    delete user
+    Soft-delete a user by setting deleted_at timestamp.
     """
     try:
         user = User.query.get(id)
         if user is None:
-            return ValidationResponse(success=False, message= "User tidak ditemukan")
-            
+            return ValidationResponse(success=False, message="User not found.")
+
         if user.deleted_at is None:
             user.deleted_at = func.now()
             db.session.commit()
             return user
         else:
-            # Opsional: Beri tahu jika user sebenarnya sudah dalam kondisi terhapus
-            return ValidationResponse(success=False,message= "User sudah dihapus sebelumnya")
+            return ValidationResponse(success=False, message="This user account is already deactivated.")
     except Exception as e:
         db.session.rollback()
-        logging.error(f"unexpected error delete on id:{id}: {str(e)}")
-        return ValidationResponse(success=False,message="unexpected error delete")
+        logging.error(f"Unexpected error during delete on id:{id}: {str(e)}")
+        return ValidationResponse(success=False, message="Unexpected error during delete.")
 
-def update_user_by(id,user_instance):
+
+def update_user_by(id, user_instance, caller_roles=None):
     """
-    update age or password by id
+    Update user fields by ID with RBAC field-level filtering.
+    Only fields allowed by the caller's role will be applied.
+    Blocks OAuth users from updating password.
     """
+    from app.permissions.field_filter import get_allowed_fields
+
+    if caller_roles is None:
+        caller_roles = []
+
     try:
         user = User.query.get(id)
         if user is None:
-            return ValidationResponse(success=False, message= "User tidak ditemukan")
-        if getattr(user_instance, 'age', None) is not None and user_instance.age != "":
-            user.age = user_instance.age
-        new_hash_password = getattr(user_instance, 'provider_key', None)
-        if new_hash_password is not None and new_hash_password != "":
-            user.provider_key = new_hash_password
+            return ValidationResponse(success=False, message="User not found.")
+
+        # Get allowed fields for this role
+        allowed = get_allowed_fields("users", caller_roles, "update")
+
+        # Block OAuth users from updating password
+        if user.provider != AuthProvider.PASSWORD_HASH:
+            if "password" in allowed:
+                allowed = allowed - {"password"}
+
+        # Apply age if allowed
+        if "age" in allowed:
+            age_val = getattr(user_instance, 'age', None)
+            if age_val is not None and age_val != "":
+                user.age = age_val
+
+        # Apply password if allowed
+        if "password" in allowed:
+            new_hash_password = getattr(user_instance, 'provider_key', None)
+            if new_hash_password is not None and new_hash_password != "":
+                user.provider_key = new_hash_password
+
+        # Apply roles if allowed (admin/superadmin only)
+        if "roles" in allowed:
+            roles_val = getattr(user_instance, 'roles', None)
+            if roles_val is not None:
+                # Convert string list to UserRole enum list
+                user.roles = [UserRole(r) for r in roles_val]
+
+        # Apply is_active if allowed (admin/superadmin only)
+        if "is_active" in allowed:
+            is_active_val = getattr(user_instance, 'is_active', None)
+            if is_active_val is not None:
+                user.is_active = is_active_val
+
+        # Check if any field was actually in the allowed set
+        attempted_fields = set()
+        if getattr(user_instance, 'age', None) is not None:
+            attempted_fields.add("age")
+        if getattr(user_instance, 'provider_key', None) is not None:
+            attempted_fields.add("password")
+        if getattr(user_instance, 'roles', None) is not None:
+            attempted_fields.add("roles")
+        if getattr(user_instance, 'is_active', None) is not None:
+            attempted_fields.add("is_active")
+
+        blocked_fields = attempted_fields - allowed
+        if blocked_fields and not (attempted_fields & allowed):
+            return ValidationResponse(
+                success=False,
+                message=f"Your role does not have permission to update: {', '.join(blocked_fields)}"
+            )
+
         db.session.commit()
         return user
     except Exception as e:
         db.session.rollback()
-        logging.error(f"unexpected error delete on id:{id}: {str(e)}")
-        return ValidationResponse(success=False,message=f"unexpected error update on id:{id}")
+        logging.error(f"Unexpected error during update on id:{id}: {str(e)}")
+        return ValidationResponse(success=False, message=f"Unexpected error during update on id:{id}")
+
+
+def become_seller(user_id):
+    """
+    Add SELLER role to user's role array if not already present.
+    """
+    try:
+        user = User.query.get(user_id)
+        if user is None:
+            return ValidationResponse(success=False, message="User not found.")
+
+        if user.deleted_at is not None:
+            return ValidationResponse(success=False, message="This account has been deactivated.")
+
+        if UserRole.SELLER in (user.roles or []):
+            return ValidationResponse(success=False, message="You are already a seller.")
+
+        # Add SELLER to existing roles
+        current_roles = list(user.roles) if user.roles else []
+        current_roles.append(UserRole.SELLER)
+        user.roles = current_roles
+        db.session.commit()
+
+        return user
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Unexpected error during become_seller for id:{user_id}: {str(e)}")
+        return ValidationResponse(success=False, message="Unexpected error during role update.")
+
 
 def add_new_users(user_instance):
     """
-    Menambah data pengguna baru ke database.
-    Menerima 'user_instance' berupa objek Model User SQLAlchemy utuh dari Smorest.
+    Add a new user to the database.
+    Accepts 'user_instance' as a full SQLAlchemy User Model object from Smorest.
     """
-    # 1. Ambil data mentah dari properti objek yang dikirim oleh Smorest Gate
+    # 1. Extract raw data from the object properties sent by Smorest
     email = user_instance.email
 
-    # 2. Jalankan fungsi penormalan & validasi internet andalan Anda
+    # 2. Run email normalization & validation
     validated_email = normalize_and_validate_email(email)
     if validated_email is None:
         return ValidationResponse(success=False, message="Email format is wrong")
-    
+
     try:
-        # 3. Generate data otomatis internal sistem menggunakan kode asli Anda
+        # 3. Generate internal system data automatically
         username = validated_email.split('@')[0]
 
         user_instance.username = username
-        user_instance.email = validated_email   
+        user_instance.email = validated_email
 
         db.session.add(user_instance)
         db.session.commit()
 
-        return user_instance 
+        return user_instance
 
     except IntegrityError as e:
         db.session.rollback()
-        
-        # Ambil pesan asli dari driver database Anda
+
         error_msg = str(e.orig)
-        
+
         if "users_email_key" in error_msg or "already exists" in error_msg:
             return ValidationResponse(success=False, message=f"Email '{validated_email}' is already registered.")
-        
+
         return ValidationResponse(success=False, message="Database integrity constraint violation.")
 
     except Exception as e:
         db.session.rollback()
-        logging.error(f"Gagal memproses pendaftaran user: {str(e)}")
+        logging.error(f"Failed to process user registration: {str(e)}")
         return ValidationResponse(success=False, message="An unexpected database error occurred.")
+
 
 def normalize_and_validate_email(email_input):
     """
-    Menormalisasi email untuk mencegah manipulasi alias (terutama Gmail).
-    Contoh: 'andrew.twitter+youtube@gmail.com' -> 'andrew@gmail.com'
+    Normalize email to prevent alias manipulation (especially Gmail).
+    Example: 'andrew.twitter+youtube@gmail.com' -> 'andrew@gmail.com'
     """
     if not email_input or not isinstance(email_input, str):
         return None
@@ -132,17 +214,17 @@ def normalize_and_validate_email(email_input):
 
     username_part, domain_part = email_address.split('@', 1)
 
-    # Normalisasi khusus Gmail Anda yang sangat detail
+    # Gmail-specific normalization
     if domain_part in ['gmail.com', 'googlemail.com']:
-        username_part = username_part.split('+')[0]  # Hapus bagian setelah +
-        username_part = username_part.replace('.', '') # Hapus semua titik
+        username_part = username_part.split('+')[0]   # Remove everything after +
+        username_part = username_part.replace('.', '')  # Remove all dots
 
     cleaned_email = f"{username_part}@{domain_part}"
 
     try:
         email_info = validate_email(cleaned_email, check_deliverability=True)
         return email_info.normalized
-        
+
     except EmailNotValidError as e:
-        logging.warning(f"Email tidak lolos validasi internet: {cleaned_email}. Alasan: {str(e)}")
+        logging.warning(f"Email failed internet validation: {cleaned_email}. Reason: {str(e)}")
         return None
