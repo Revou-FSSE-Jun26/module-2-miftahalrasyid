@@ -109,7 +109,6 @@ class AuthLogin(MethodView):
 
         if isinstance(result, ValidationResponse):
             abort(400, message=result.message)
-        print("result",result)
         return result
 
 

@@ -1,5 +1,4 @@
 import os
-import bcrypt
 import hashlib
 import logging
 import smtplib
@@ -108,7 +107,7 @@ def register_user(email, password, age):
             roles      = [UserRole.BUYER],
         )
         
-        # Set password via setter (automatically bcrypt-hashed)
+        # Set password via setter (automatically hashed with Werkzeug PBKDF2)
         new_user.password = password
 
         db.session.add(new_user)
@@ -166,20 +165,19 @@ def login_user(email, password):
     if user.provider != AuthProvider.PASSWORD_HASH:
         return ValidationResponse(success=False, message="This account uses Google OAuth. Please login with Google.")
 
-    # Verify password using bcrypt with SHA256 fallback
-    # First try bcrypt
+    # Verify password with SHA256 fallback for legacy hashes
     try:
         if not user.verify_password(password):
             return ValidationResponse(success=False, message="Invalid email or password.")
     except (ValueError, TypeError):
-        # If bcrypt fails, try SHA256 for backward compatibility
+        # If verification fails, try SHA256 for backward compatibility
         password_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
         if user.provider_key != password_hash:
             return ValidationResponse(success=False, message="Invalid email or password.")
-        # Password verified with SHA256 - upgrade to bcrypt
+        # Password verified with SHA256 - upgrade to Werkzeug PBKDF2
         user.password = password
         db.session.commit()
-        logging.info(f"Upgraded password hash to bcrypt for user: {user.email}")
+        logging.info(f"Upgraded password hash to PBKDF2 for user: {user.email}")
 
     # Check email verification
     if not user.is_active:
