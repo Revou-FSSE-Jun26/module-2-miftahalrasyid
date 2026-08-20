@@ -59,12 +59,13 @@ def create_app():
             print(f"Connection failed: {e}")
 
     # --- Register Smorest Blueprints (imported inside function to prevent circular imports) ---
-    from app.routes import product_bp, users_bp, order_bp, auth_bp
+    from app.routes import product_bp, users_bp, order_bp, auth_bp, category_bp
 
     api.register_blueprint(auth_bp)
     api.register_blueprint(users_bp)
     api.register_blueprint(product_bp)
     api.register_blueprint(order_bp)
+    api.register_blueprint(category_bp)
     print("Flask app initialized successfully.")
     @app.route('/api')
     def home():

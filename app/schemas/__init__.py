@@ -2,7 +2,8 @@ from .user_schema import UserSchema, UserUpdateFormSchema, UserUpdateSuccessResp
 from .product_schema import ProductSchema, ProductUpdateSchema, ProductErrorExamples
 from .order_schema import OrderSchema
 from .order_item_schema import OrderItemSchema, OrderErrorExamples, OrderUpdateSuccessResponseSchema
-from .category_schema import CategorySchema
+from .category_schema import CategorySchema, CategoryUpdateSchema
+from .delete_schema import DeleteActionSchema
 from .auth_schema import (
     RegisterSchema,
     LoginSchema,
@@ -22,6 +23,8 @@ __all__ = [
     "OrderErrorExamples",
     "OrderUpdateSuccessResponseSchema",
     "CategorySchema",
+    "CategoryUpdateSchema",
+    "DeleteActionSchema",
     "UserUpdateFormSchema",
     "UserUpdateSuccessResponseSchema",
     "UserErrorExamples",
