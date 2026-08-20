@@ -278,6 +278,7 @@ flowchart TD
 ├── README.md
 ├── app/
 │   ├── __init__.py
+│   ├── extensions.py
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── category_items_model.py
@@ -286,24 +287,32 @@ flowchart TD
 │   │   ├── order_model.py
 │   │   ├── product_model.py
 │   │   └── user_model.py
+│   ├── permissions/
+│   │   ├── __init__.py
+│   │   └── field_filter.py
 │   ├── routes/
 │   │   ├── __init__.py
 │   │   └── v1/
 │   │       ├── __init__.py
 │   │       ├── auth_routes_v1.py
+│   │       ├── category_routes_v1.py
 │   │       ├── orders_routes_v1.py
 │   │       ├── product_routes_v1.py
 │   │       └── users_routes_v1.py
 │   ├── schemas/
 │   │   ├── __init__.py
+│   │   ├── auth_schema.py
 │   │   ├── category_schema.py
+│   │   ├── order_item_schema.py
 │   │   ├── order_schema.py
 │   │   ├── product_schema.py
 │   │   └── user_schema.py
-│   ├── seeds/
-│   │   └── initial_seed.py
 │   └── services/
 │       ├── __init__.py
+│       ├── auth_service.py
+│       ├── category_service.py
+│       ├── order_service.py
+│       ├── product_service.py
 │       └── user_service.py
 ├── docs/
 │   ├── queries.sql
@@ -316,13 +325,24 @@ flowchart TD
 │   ├── env.py
 │   ├── script.py.mako
 │   └── versions/
+│       ├── 1a42d12c6f44_rename_products_quantity_column_to_.py
 │       ├── 37490e1a0463_add_username_and_role_enum_to_users.py
 │       ├── 3ce39395ca90_alter_orders_layout_and_data_types.py
+│       ├── 503a9a24193e_add_deleted_at_and_change_all_to_server_.py
+│       ├── 7633e2e310ef_convert_order_items_from_junction_table_.py
+│       ├── 815a83d2ddfb_add_deleted_at_to_orders.py
+│       ├── 9a575b777f47_change_provider_column_from_string_to_.py
+│       ├── bf1bb0ac101e_add_is_active_and_sku_to_products.py
 │       ├── c00af829578d_fix_junction_mapping_to_string.py
+│       ├── c7f2cbb27adc_change_role_to_roles_user_table.py
+│       ├── d95589515a54_add_deleted_at_to_categories_and_server_.py
 │       ├── e5dadb8947a1_convert_order_items_to_pure_many_to_.py
+│       ├── e6f0237835c7_update_orderstatus_enum_values.py
 │       └── fb1b2de14c14_add_deleted_at_on_user.py
 ├── requirements.txt
-└── run.py
+├── run.py
+└── seeds/
+    └── initial_seed.py
 ```
 
 
