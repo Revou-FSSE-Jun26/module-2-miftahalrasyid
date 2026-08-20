@@ -56,6 +56,54 @@ def delete_user_by(id):
         return ValidationResponse(success=False, message="Unexpected error during delete.")
 
 
+def delete_user(user_id, caller_roles, action="soft"):
+    """
+    Delete a user by ID.
+    Default = soft delete (set deleted_at).
+    Superadmin can pass action="hard" to permanently remove.
+    
+    Args:
+        user_id: User ID to delete
+        caller_roles: Caller's roles from JWT
+        action: "soft" (default) or "hard" (superadmin only)
+    
+    Returns:
+        dict on success, ValidationResponse on error, None on failure
+    """
+    from app.permissions.field_filter import get_delete_policy
+
+    try:
+        user = User.query.get(user_id)
+        if user is None:
+            return ValidationResponse(success=False, message="User not found.")
+
+        delete_policy = get_delete_policy("users", caller_roles)
+        if delete_policy is None:
+            return ValidationResponse(success=False, message="Your role does not have permission to delete users.")
+
+        # Hard delete: only if role policy allows "hard" AND action requested is "hard"
+        if action == "hard":
+            if delete_policy != "hard":
+                return ValidationResponse(success=False, message="Only superadmin can perform hard delete")
+            db.session.delete(user)
+            db.session.commit()
+            logging.info(f"User hard-deleted: {user_id}")
+            return {"message": f"User {user_id} permanently deleted"}
+
+        # Soft delete (default)
+        if user.deleted_at is not None:
+            return ValidationResponse(success=False, message="This user account is already deactivated.")
+        user.deleted_at = func.now()
+        db.session.commit()
+        logging.info(f"User soft-deleted: {user_id}")
+        return {"message": f"User {user_id} soft-deleted"}
+
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to delete user {user_id}: {str(e)}")
+        return ValidationResponse(success=False, message="Unexpected error during delete.")
+
+
 def update_user_by(id, user_instance, caller_roles=None):
     """
     Update user fields by ID with RBAC field-level filtering.

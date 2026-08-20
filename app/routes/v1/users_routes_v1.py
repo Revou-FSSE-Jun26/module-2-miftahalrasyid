@@ -3,13 +3,14 @@ from flask import request, jsonify
 from flask_smorest import Blueprint, abort
 from flask_jwt_extended import get_jwt_identity, get_jwt
 from app.services.auth_service import roles_required
-from app.schemas import UserSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples
+from app.models import UserRole
+from app.schemas import UserSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples, DeleteActionSchema
 from app.permissions.field_filter import get_delete_policy
 from app.services.user_service import (
     get_all_users,
     add_new_users,
     get_user_by,
-    delete_user_by,
+    delete_user,
     update_user_by,
     become_seller,
     ValidationResponse
@@ -26,8 +27,9 @@ users_bp = Blueprint(
 @users_bp.route('/')
 class UsersRoot(MethodView):
 
+    @users_bp.doc(security=[{"BearerAuth": []}])
     @users_bp.response(200, UserSchema(many=True))
-    @roles_required('BUYER', 'SELLER', 'ADMIN', 'SUPERADMIN')
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     def get(self):
         """Show all users where deleted_at is None"""
         all_users = get_all_users()
@@ -35,32 +37,9 @@ class UsersRoot(MethodView):
             abort(500, message="Failed to retrieve data from database.")
         return jsonify({"success":True,"message":"show all users succssfull","data":all_users}),200
 
-    @users_bp.doc(responses={
-        "422": {
-            "description": "JSON Input Validation Failures",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "EmailInvalid": UserErrorExamples.EMAIL_INVALID,
-                        "AllFieldsMissing": UserErrorExamples.ALL_FIELDS_MISSING,
-                        "AgeInvalid": UserErrorExamples.AGE_INVALID,
-                    }
-                }
-            }
-        },
-        "400": {
-            "description": "Business Logic Failures",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "EmailDuplicated": UserErrorExamples.EMAIL_DUPLICATED,
-                    }
-                }
-            }
-        }
-    })
+    @users_bp.doc(responses=UserErrorExamples.RESPONSES_POST_USER, security=[{"BearerAuth": []}])
     @users_bp.arguments(UserSchema, location="json")
-    @roles_required('BUYER', 'SELLER', 'ADMIN', 'SUPERADMIN')
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @users_bp.response(201, UserSchema)
     def post(self, user_instance):
         """Add a new user to the database"""
@@ -83,14 +62,13 @@ class UserDetail(MethodView):
         return user_data
 
     @users_bp.doc(responses=UserErrorExamples.RESPONSES_PUT_USER, security=[{"BearerAuth": []}])
-    @roles_required('BUYER', 'SELLER', 'ADMIN', 'SUPERADMIN')
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @users_bp.arguments(UserUpdateFormSchema, location="json")
     @users_bp.response(200, UserUpdateSuccessResponseSchema)
     def put(self, user_instance, id):
         """
-        Update user profile or perform soft-delete via JSON body.
+        Update user profile.
         Requires JWT Bearer token. Admin/Superadmin can update any user.
-        Set 'action' to 'delete' to deactivate the account.
         """
         current_user_id = int(get_jwt_identity())
         claims = get_jwt()
@@ -100,26 +78,6 @@ class UserDetail(MethodView):
         is_admin = any(r in ("ADMIN", "SUPERADMIN") for r in caller_roles)
         if current_user_id != id and not is_admin:
             abort(403, message="You can only modify your own profile.")
-
-        action_type = user_instance.action if hasattr(user_instance, 'action') else 'update'
-        if not isinstance(action_type, str):
-            action_type = 'update'
-        action_type = action_type.lower()
-
-        if action_type == 'delete':
-            # Check RBAC delete permission
-            delete_policy = get_delete_policy("users", caller_roles)
-            if delete_policy is None:
-                abort(403, message="Your role does not have permission to delete users.")
-            result = delete_user_by(id)
-            if isinstance(result, ValidationResponse):
-                abort(400, message=result.message)
-            success_response = {
-                "form": {
-                    "user": ["user has been deleted"]
-                }
-            }
-            return success_response, 200
 
         result = update_user_by(id, user_instance, caller_roles)
         if isinstance(result, ValidationResponse):
@@ -150,11 +108,32 @@ class UserDetail(MethodView):
         return success_response, 200
 
 
+    @users_bp.doc(security=[{"BearerAuth": []}])
+    @users_bp.arguments(DeleteActionSchema, location="json")
+    @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    @users_bp.response(200, UserSchema)
+    def delete(self, delete_data, id):
+        """Delete a user by ID. Default=soft delete. Superadmin can pass {"action":"hard"}."""
+        claims = get_jwt()
+        caller_roles = claims.get("roles", [])
+        action = delete_data.get("action", "soft")
+
+        result = delete_user(id, caller_roles, action)
+
+        if isinstance(result, ValidationResponse):
+            abort(400, message=result.message)
+
+        if result:
+            return jsonify({"success": True, "message": result["message"]}), 200
+        else:
+            return jsonify({"success": False, "message": "Failed to delete user"}), 400
+
+
 @users_bp.route('/become-seller')
 class UserBecomeSeller(MethodView):
 
     @users_bp.doc(responses=UserErrorExamples.RESPONSES_BECOME_SELLER, security=[{"BearerAuth": []}])
-    @roles_required('BUYER', 'SELLER', 'ADMIN', 'SUPERADMIN')
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @users_bp.response(200, UserSchema)
     def post(self):
         """

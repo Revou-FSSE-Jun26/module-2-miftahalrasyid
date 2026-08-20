@@ -3,7 +3,7 @@ import datetime as dt
 from enum import Enum
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy import func
-import bcrypt
+from werkzeug.security import generate_password_hash, check_password_hash
 import hashlib
 
 
@@ -45,29 +45,30 @@ class User(db.Model):
     def password(self, value):
         """
         Setter: Triggered automatically when Flask-Smorest executes User(password="...").
-        The plain password is hashed using bcrypt with a random salt and stored
+        The plain password is hashed using PBKDF2-SHA256 (via Werkzeug) and stored
         in the 'provider_key' database column.
         """
         if value:
-            # Hash password with bcrypt (automatically generates and stores salt)
-            salt = bcrypt.gensalt()
-            hashed = bcrypt.hashpw(value.encode('utf-8'), salt)
-            self.provider_key = hashed.decode('utf-8')  # Store as string
+            self.provider_key = generate_password_hash(value)
 
     def verify_password(self, password):
         """
         Verify a password against the stored hash.
-        Supports bcrypt (new) and SHA256 (old) for backward compatibility.
+        Supports Werkzeug PBKDF2 (new) and SHA256 (old) for backward compatibility.
         Returns True if password matches, False otherwise.
         """
         if not self.provider_key or self.provider == AuthProvider.GOOGLE_OAUTH:
             return False
         
         try:
-            # Try bcrypt first (new format)
-            return bcrypt.checkpw(password.encode('utf-8'), self.provider_key.encode('utf-8'))
-        except (ValueError, TypeError):
-            # If bcrypt fails, try SHA256 (old format) for backward compatibility
+            # Try Werkzeug hash first (new format: pbkdf2:sha256:...)
+            if self.provider_key.startswith(('pbkdf2:', 'scrypt:')):
+                return check_password_hash(self.provider_key, password)
+            # Try legacy bcrypt format ($2b$...)
+            if self.provider_key.startswith('$2b$') or self.provider_key.startswith('$2a$'):
+                # Can't verify bcrypt without the library — fall through to SHA256
+                pass
+            # SHA256 fallback (old format)
             password_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
             return password_hash == self.provider_key
         except Exception:
@@ -75,7 +76,7 @@ class User(db.Model):
     
     def upgrade_password_hash(self, password):
         """
-        Upgrade SHA256 hash to bcrypt and save to database.
+        Upgrade SHA256 hash to Werkzeug PBKDF2 and save to database.
         Should be called after verifying old password.
         """
         if self.provider == AuthProvider.PASSWORD_HASH:

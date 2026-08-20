@@ -44,11 +44,12 @@ class UserSchema(SQLAlchemyAutoSchema):
     @ma.pre_load
     def strip_input_strings(self, data, **kwargs):
         """
-        Interceptor: Strip whitespace from password before Length validation
-        so that input like "   " is treated as "".
+        Strip whitespace from all string inputs before validation.
         """
-        if isinstance(data, dict) and "password" in data and isinstance(data["password"], str):
-            data["password"] = data["password"].strip()
+        if isinstance(data, dict):
+            for field in ('email', 'password'):
+                if field in data and isinstance(data[field], str):
+                    data[field] = data[field].strip()
         return data
 
 
@@ -234,6 +235,30 @@ class UserErrorExamples:
             }
         }
     }
+    RESPONSES_POST_USER = {
+        "422": {
+            "description": "JSON Input Validation Failures",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "EmailInvalid": EMAIL_INVALID,
+                        "AllFieldsMissing": ALL_FIELDS_MISSING,
+                        "AgeInvalid": AGE_INVALID,
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Business Logic Failures",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "EmailDuplicated": EMAIL_DUPLICATED,
+                    }
+                }
+            }
+        }
+    }
 
     RESPONSES_BECOME_SELLER = {
         "401": {
@@ -314,20 +339,16 @@ class UserUpdateFormSchema(UserSchema):
         load_only=True,
         validate=ma.validate.Length(min=1, error="Password cannot be an empty string.")
     )
-    action = ma.fields.Str(
-        required=False,
-        load_default="update",
-        metadata={"example": "delete"}
-    )
 
     @ma.pre_load
     def strip_input_strings(self, data, **kwargs):
         """
-        Interceptor: Strip whitespace from password before Length validation
-        so that input like "   " is treated as "".
+        Strip whitespace from all string inputs before validation.
         """
-        if isinstance(data, dict) and "password" in data and isinstance(data["password"], str):
-            data["password"] = data["password"].strip()
+        if isinstance(data, dict):
+            for field in ('password',):
+                if field in data and isinstance(data[field], str):
+                    data[field] = data[field].strip()
         return data
 
     @ma.validates_schema
@@ -335,9 +356,6 @@ class UserUpdateFormSchema(UserSchema):
         """
         Ensure the client provides at least one updatable field.
         """
-        if data.get('action') == 'delete':
-            return
-
         age_val = data.get('age')
         password_val = data.get('password')
         roles_val = data.get('roles')
