@@ -90,4 +90,30 @@ FIELD_PERMISSIONS = {
             "delete": None,
         },
     },
+    "orders": {
+        "SUPERADMIN": {
+            "create": {"name", "status", "total", "user_id"},
+            "read":   {"id", "user_id", "name", "status", "total", "created_at", "deleted_at"},
+            "update": {"name", "status"},
+            "delete": "hard",
+        },
+        "ADMIN": {
+            "create": {"name", "status", "total", "user_id"},
+            "read":   {"id", "user_id", "name", "status", "total", "created_at", "deleted_at"},
+            "update": {"name", "status"},
+            "delete": "soft",
+        },
+        "SELLER": {
+            "create": set(),
+            "read":   {"id", "user_id", "name", "status", "total", "created_at"},
+            "update": {"status"},
+            "delete": None,
+        },
+        "BUYER": {
+            "create": {"name"},
+            "read":   {"id", "name", "status", "total", "created_at"},
+            "update": set(),
+            "delete": "soft",
+        },
+    },
 }

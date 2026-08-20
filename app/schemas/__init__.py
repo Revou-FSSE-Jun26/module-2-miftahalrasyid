@@ -1,6 +1,6 @@
 from .user_schema import UserSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples
 from .product_schema import ProductSchema, ProductUpdateSchema, ProductErrorExamples
-from .order_schema import OrderSchema
+from .order_schema import OrderSchema, OrderUpdateSchema
 from .order_item_schema import OrderItemSchema, OrderErrorExamples, OrderUpdateSuccessResponseSchema
 from .category_schema import CategorySchema, CategoryUpdateSchema
 from .auth_schema import (
@@ -37,6 +37,7 @@ __all__ = [
     "ProductUpdateSchema",
     "ProductErrorExamples",
     "OrderSchema",
+    "OrderUpdateSchema",
     "OrderItemSchema",
     "OrderErrorExamples",
     "OrderUpdateSuccessResponseSchema",
