@@ -17,6 +17,8 @@ Thumbs.db
 # VS Code / PyCharm settings
 .vscode/
 .idea/
+# kiro
+.kiro
 
 ### --- AWS / Deployment ---
 # AWS CLI or SAM local caches
