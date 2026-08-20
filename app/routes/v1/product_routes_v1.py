@@ -1,8 +1,8 @@
 from flask.views import MethodView
 from flask import jsonify
 from flask_smorest import Blueprint, abort
-from app.schemas import ProductSchema, ProductUpdateSchema, ProductErrorExamples
-from app.services import get_all_products, create_new_product, update_product, get_product_by_id, ValidationResponse
+from app.schemas import ProductSchema, ProductUpdateSchema, ProductErrorExamples, DeleteActionSchema
+from app.services import get_all_products, create_new_product, update_product, get_product_by_id, delete_product, ValidationResponse
 from app.models import Category, UserRole
 from app.services.auth_service import roles_required
 from flask_jwt_extended import get_jwt_identity, get_jwt
@@ -29,7 +29,7 @@ class ProductsRoot(MethodView):
 
     @product_bp.doc(responses=ProductErrorExamples.RESPONSES_POST_PRODUCT,security=[{"BearerAuth": []}])
     @product_bp.arguments(ProductSchema, location="json")
-    @roles_required('SELLER', 'ADMIN', 'SUPERADMIN')
+    @roles_required(UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @product_bp.response(201, ProductSchema)
     def post(self, product_instance):
         """Add a new product"""
@@ -62,13 +62,14 @@ class ProductDetail(MethodView):
 
     @product_bp.doc(security=[{"BearerAuth": []}])
     @product_bp.arguments(ProductUpdateSchema, location="json")
-    @roles_required('SELLER', 'ADMIN', 'SUPERADMIN')
+    @roles_required(UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @product_bp.response(200, ProductSchema)
     def put(self, update_data, id):
-        """Update a product by ID"""
+        """Update a product by ID."""
         roles = get_jwt()['roles']
         jwt_user_id = get_jwt_identity()
 
+        # Normal update flow
         product = update_product(id, update_data, jwt_user_id, roles)
 
         if isinstance(product, ValidationResponse):
@@ -78,3 +79,23 @@ class ProductDetail(MethodView):
             return jsonify({"success": True, "message": "Product updated successfully", "data": product.to_dict()}), 200
         else:
             return jsonify({"success": False, "message": "Failed to update product"}), 400
+
+    @product_bp.doc(security=[{"BearerAuth": []}])
+    @product_bp.arguments(DeleteActionSchema, location="json")
+    @roles_required(UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    @product_bp.response(200, ProductSchema)
+    def delete(self, delete_data, id):
+        """Delete a product by ID. Default=soft delete. Superadmin can pass {"action":"hard"}."""
+        roles = get_jwt()['roles']
+        jwt_user_id = get_jwt_identity()
+        action = delete_data.get("action", "soft")
+
+        result = delete_product(id, jwt_user_id, roles, action)
+
+        if isinstance(result, ValidationResponse):
+            abort(400, message=result.message)
+
+        if result:
+            return jsonify({"success": True, "message": result["message"]}), 200
+        else:
+            return jsonify({"success": False, "message": "Failed to delete product"}), 400

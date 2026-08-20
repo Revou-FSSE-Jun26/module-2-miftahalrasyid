@@ -60,7 +60,6 @@ class ProductSchema(SQLAlchemyAutoSchema):
         metadata     = {"example": [1, 2]}
     )
     is_active  = ma.fields.Bool(
-        dump_only    = True,
         required     = False,
         load_default = True
     )

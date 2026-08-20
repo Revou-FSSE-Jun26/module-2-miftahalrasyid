@@ -99,7 +99,8 @@ def create_new_product(jwt_user_id, product_instance,client_roles):
     
 def update_product(product_id, update_data, jwt_user_id, roles):
     """
-    Update a product by ID. Only owner, admin, or superadmin can update.
+    Update a product by ID with RBAC field-level filtering.
+    Only owner, admin, or superadmin can update.
     
     Args:
         product_id: Product ID to update
@@ -110,6 +111,8 @@ def update_product(product_id, update_data, jwt_user_id, roles):
     Returns:
         Product on success, ValidationResponse on error, None on failure
     """
+    from app.permissions.field_filter import get_allowed_fields
+
     try:
         product = Product.query.filter(
             Product.id == product_id,
@@ -124,17 +127,26 @@ def update_product(product_id, update_data, jwt_user_id, roles):
         if product.user_id != int(jwt_user_id) and not is_admin:
             return ValidationResponse(success=False, message="Unauthorized to update this product")
 
-        # Handle category_ids separately
+        # RBAC: filter fields by role
+        allowed = get_allowed_fields("products", roles, "update")
+        blocked_fields = set(update_data.keys()) - allowed - {"category_ids"}
+        if blocked_fields and not (set(update_data.keys()) & allowed):
+            return ValidationResponse(
+                success=False,
+                message=f"Your role does not have permission to update: {', '.join(blocked_fields)}"
+            )
+
+        # Handle category_ids separately (if allowed)
         category_ids = update_data.pop('category_ids', None)
-        if category_ids is not None:
+        if category_ids is not None and "category_ids" in allowed:
             categories = Category.query.filter(Category.id.in_(category_ids)).all()
             if len(categories) != len(category_ids):
                 return ValidationResponse(success=False, message="Some category IDs not found")
             product.categories = categories
 
-        # Update scalar fields
+        # Update only allowed scalar fields
         for key, value in update_data.items():
-            if hasattr(product, key):
+            if key in allowed and hasattr(product, key):
                 setattr(product, key, value)
 
         db.session.commit()
@@ -148,6 +160,63 @@ def update_product(product_id, update_data, jwt_user_id, roles):
     except Exception as e:
         db.session.rollback()
         logging.error(f"Failed to update product: {str(e)}")
+        return None
+
+
+def delete_product(product_id, jwt_user_id, roles, action="soft"):
+    """
+    Delete a product by ID.
+    Default = soft delete (set deleted_at).
+    Superadmin can pass action="hard" to permanently remove.
+    Seller can only soft-delete own products (TODO: check no pending orders).
+    
+    Args:
+        product_id: Product ID to delete
+        jwt_user_id: Authenticated user's ID
+        roles: User's roles from JWT
+        action: "soft" (default) or "hard" (superadmin only)
+    
+    Returns:
+        dict on success, ValidationResponse on error, None on failure
+    """
+    from app.permissions.field_filter import get_delete_policy
+
+    try:
+        product = Product.query.filter(Product.id == product_id).first()
+
+        if not product:
+            return ValidationResponse(success=False, message="Product not found")
+
+        # Check delete permission
+        delete_policy = get_delete_policy("products", roles)
+        if delete_policy is None:
+            return ValidationResponse(success=False, message="Your role does not have permission to delete products")
+
+        # Authorization: owner or admin/superadmin
+        is_admin = any(r in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) for r in roles)
+        if product.user_id != int(jwt_user_id) and not is_admin:
+            return ValidationResponse(success=False, message="Unauthorized to delete this product")
+
+        # Hard delete: only if role policy allows "hard" AND action requested is "hard"
+        if action == "hard":
+            if delete_policy != "hard":
+                return ValidationResponse(success=False, message="Only superadmin can perform hard delete")
+            db.session.delete(product)
+            db.session.commit()
+            logging.info(f"Product hard-deleted: {product_id}")
+            return {"message": f"Product {product_id} permanently deleted"}
+
+        # Soft delete (default)
+        if product.deleted_at is not None:
+            return ValidationResponse(success=False, message="Product is already deleted")
+        product.deleted_at = func.now()
+        db.session.commit()
+        logging.info(f"Product soft-deleted: {product_id}")
+        return {"message": f"Product {product_id} soft-deleted"}
+
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to delete product {product_id}: {str(e)}")
         return None
 
 
