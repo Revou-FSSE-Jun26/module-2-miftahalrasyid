@@ -47,7 +47,7 @@ class OrderUpdateSchema(ma.Schema):
             [s.value for s in OrderStatus],
             error="Invalid order status. Choose from: {choices}."
         ),
-        metadata={"example": "PROCESSED"}
+        metadata={"example": "COMPLETED"}
     )
     name = ma.fields.Str(
         required=False,

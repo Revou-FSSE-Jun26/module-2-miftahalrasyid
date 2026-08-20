@@ -107,7 +107,7 @@ def create_order(order_instance, items_data, jwt_user_id, roles):
 
     # Set user_id
     order_instance.user_id = int(jwt_user_id)
-    order_instance.status = OrderStatus.PENDING
+    order_instance.status = OrderStatus.PAID
 
     try:
         # Validate items and calculate total
@@ -245,13 +245,17 @@ def update_order(order_id, update_data, jwt_user_id, roles):
             except ValueError:
                 return ValidationResponse(success=False, message=f"Invalid status: {new_status}")
 
-            # Validate status transition order
+            # Validate status transition: PAID → COMPLETED or PAID → CANCELED only
             valid = _validate_status_transition(order.status, new_status_enum)
             if not valid:
                 return ValidationResponse(
                     success=False,
-                    message=f"Invalid status transition from {order.status.value} to {new_status_enum.value}"
+                    message=f"Invalid status transition from {order.status.value} to {new_status_enum.value}. Allowed: PAID → COMPLETED or PAID → CANCELED"
                 )
+
+            # If transitioning to CANCELED, restore stock
+            if new_status_enum == OrderStatus.CANCELED:
+                _restore_stock(order.id)
 
         # Apply allowed fields
         for key, value in update_data.items():
@@ -304,11 +308,11 @@ def delete_order(order_id, jwt_user_id, roles, action="soft"):
         is_admin = any(r in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) for r in roles)
 
         if not is_admin:
-            # Buyer can only cancel own PENDING orders
+            # Buyer can only cancel own PAID orders
             if order.user_id != int(jwt_user_id):
                 return ValidationResponse(success=False, message="Unauthorized to delete this order")
-            if order.status != OrderStatus.PENDING:
-                return ValidationResponse(success=False, message="Can only cancel orders with PENDING status")
+            if order.status != OrderStatus.PAID:
+                return ValidationResponse(success=False, message="Can only cancel orders with PAID status")
 
         # Hard delete: only superadmin with action="hard"
         if action == "hard":
@@ -325,8 +329,8 @@ def delete_order(order_id, jwt_user_id, roles, action="soft"):
         if order.deleted_at is not None:
             return ValidationResponse(success=False, message="Order is already deleted")
 
-        # Restore stock on cancellation if order is PENDING
-        if order.status == OrderStatus.PENDING:
+        # Restore stock on cancellation if order is PAID
+        if order.status == OrderStatus.PAID:
             _restore_stock(order_id)
 
         order.deleted_at = func.now()
@@ -346,24 +350,17 @@ def delete_order(order_id, jwt_user_id, roles, action="soft"):
 
 def _validate_status_transition(current_status, new_status):
     """
-    Validate that a status transition follows the allowed order:
-    PENDING -> PROCESSED -> ACCEPTED -> SHIPPING -> DELIVERED
+    Validate that a status transition follows the allowed rules:
+    PAID -> COMPLETED (seller accepts)
+    PAID -> CANCELED (seller rejects / cancels)
+    No other transitions allowed.
     """
-    status_order = [
-        OrderStatus.PENDING,
-        OrderStatus.PROCESSED,
-        OrderStatus.ACCEPTED,
-        OrderStatus.SHIPPING,
-        OrderStatus.DELIVERED,
-    ]
+    allowed_transitions = {
+        OrderStatus.PAID: {OrderStatus.COMPLETED, OrderStatus.CANCELED},
+    }
 
-    try:
-        current_idx = status_order.index(current_status)
-        new_idx = status_order.index(new_status)
-        # Can only move forward by one step
-        return new_idx == current_idx + 1
-    except ValueError:
-        return False
+    allowed = allowed_transitions.get(current_status, set())
+    return new_status in allowed
 
 
 def _restore_stock(order_id):

@@ -6,10 +6,9 @@ from enum import Enum
 
 class OrderStatus(Enum):
     PENDING   = "PENDING"
-    PROCESSED = "PROCESSED"
-    ACCEPTED  = "ACCEPTED"
-    SHIPPING  = "SHIPPING"
-    DELIVERED = "DELIVERED"
+    PAID      = "PAID"
+    CANCELED  = "CANCELED"
+    COMPLETED = "COMPLETED"
 
 
 class Order(db.Model):

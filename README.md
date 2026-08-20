@@ -50,29 +50,37 @@ erDiagram
         int id PK
         string name
         datetime created_at
+        datetime deleted_at
     }
 
     category_items {
-        int category_id FK
-        int product_id FK
+        int category_id PK,FK
+        int product_id PK,FK
         datetime created_at
     }
 
     products {
         int id PK
         string name
-        int quantity
+        int stock
         string brand
         datetime created_at
         string description
-        int price
+        decimal price
         int user_id FK
+        boolean is_active
+        string sku
+        datetime deleted_at
     }
 
     order_items {
+        int id PK
         int order_id FK
         int product_id FK
         datetime created_at
+        int quantity
+        decimal compound_price
+        datetime deleted_at
     }
 
     orders {
@@ -81,7 +89,8 @@ erDiagram
         string name
         string status
         datetime created_at
-        int total
+        decimal total
+        datetime deleted_at
     }
 
     users {
@@ -93,8 +102,8 @@ erDiagram
         string provider_key
         datetime created_at
         string username
-        string role
         datetime deleted_at
+        array roles
     }
 
     alembic_version {
@@ -199,7 +208,7 @@ FLASK_DEBUG=1
 ```
 
 ### 4. Database Migration, & Seeding
-Jalankan migrasi, *seeding*, dan server lokal:
+run migrations and *seeding*:
 ```bash
 flask db upgrade
 python app/seeds/initial_seed.py
@@ -220,9 +229,12 @@ curl -X POST http://localhost:8000/api \
   -d '{"title": "Write unit tests", "priority": "high"}'
 ```
 
-Akses dokumentasi Swagger UI di **[http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)**.
+Access Swagger UI documentation on **[http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)**.
 
-## Seeding process
+## Seeding Objective
+
+create superadmin. **update password after**
+create 1 row in every table
 
 ### Adding initial admin user
 
@@ -234,11 +246,12 @@ Akses dokumentasi Swagger UI di **[http://localhost:8000/swagger-ui](http://loca
 flowchart TD
     %% Struktur luar diatur TD (Top-Down) agar kelompok Flask berada di bawah
     %% classDef step fill:#2d3748,stroke:#4a5568,stroke-width:2px,color:#fff;
+    classDef pink fill:#be6057,stroke:#e0847d,color:#ffffff,stroke-width:2px;
 
     subgraph Isolation_Layer ["Isolation Layer"]
         direction LR
-        A["<b>1. models.py</b><br>Create SQLAlchemy Models"]:::step 
-        --> B["<b>2. schemas.py</b><br>Map Models to Marshmallow"]:::step
+        B["<b>1. schemas.py</b><br>Map Models Column to Marshmallow"]:::step
+        --> A["<b>2. models.py</b><br>Create SQLAlchemy Models"]:::step 
         --> C["<b>3. services.py</b><br>Write Pure Business Logic"]:::step
     end
 
@@ -249,9 +262,10 @@ flowchart TD
     end
 
     %% KUNCI: Hubungkan Subgraph langsung ke Subgraph agar panahnya vertikal ke bawah
-    Isolation_Layer -->|Establish Connection to Flask| Flask_Registration
+    Client_Request:::pink --> Isolation_Layer -->|Establish Connection to Flask| Flask_Registration
 
     %% Subgraph styling
+
     %% style Isolation_Layer fill:#202632,stroke:#4a5568,stroke-width:1px
     %% style Flask_Registration fill:#1a202c,stroke:#4a5568,stroke-width:1px
 
