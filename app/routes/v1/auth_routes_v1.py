@@ -72,7 +72,40 @@ class AuthRegister(MethodView):
 
 @auth_bp.route('/login')
 class AuthLogin(MethodView):
-
+    @auth_bp.arguments(
+        LoginSchema,
+        location="json",
+        examples={
+            "Super Admin Account": {
+                "summary": "Log in as Super Admin",
+                "value": {
+                    "email": "funny.clown.1112@gmail.com",
+                    "password": "root1234"
+                }
+            },
+            "Regular Admin Account": {
+                "summary": "Log in as Admin",
+                "value": {
+                    "email": "mike@gmail.com",
+                    "password": "Password1234"
+                }
+            },
+            "Seller Account": {
+                "summary": "Log in as Seller",
+                "value": {
+                    "email": "justin@gmail.com",
+                    "password": "Password1234"
+                }
+            },
+            "Buyer Account": {
+                "summary": "Log in as Buyer",
+                "value": {
+                    "email": "budi@gmail.com",
+                    "password": "Password1234"
+                }
+            }
+        }
+    )
     @auth_bp.doc(responses={
         "422": {
             "description": "Login Validation Failures",
@@ -98,7 +131,7 @@ class AuthLogin(MethodView):
             }
         }
     })
-    @auth_bp.arguments(LoginSchema, location="json")
+    # @auth_bp.arguments(LoginSchema, location="json")
     @auth_bp.response(200, TokenResponseSchema)
     def post(self, data):
         """Login with email and password. Returns a JWT access token."""

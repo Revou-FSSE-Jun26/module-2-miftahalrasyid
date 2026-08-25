@@ -21,37 +21,8 @@ from app.services.user_service import normalize_and_validate_email, ValidationRe
 # =============================================================================
 # ROLE-BASED ACCESS DECORATOR
 # =============================================================================
-
-def roles_required(*allowed_roles):
-    """
-    Decorator that checks if the current user has one of the allowed roles.
-
-    Usage:
-        @roles_required('ADMIN', 'SELLER')
-        def my_route():
-            ...
-
-    How it works:
-        1. Verifies the JWT is present and valid (like @jwt_required())
-        2. Reads the 'roles' claim (array) from the JWT payload
-        3. Returns 403 if none of the user's roles are in the allowed list
-    """
-    def wrapper(fn):
-        @wraps(fn)
-        def decorator(*args, **kwargs):
-            verify_jwt_in_request()
-            claims = get_jwt()
-            user_roles = claims.get("roles", [])
-
-            if not any(r in allowed_roles for r in user_roles):
-                return jsonify({
-                    "error": "Forbidden",
-                    "message": f"Access denied. Required role(s): {', '.join(allowed_roles)}"
-                }), 403
-
-            return fn(*args, **kwargs)
-        return decorator
-    return wrapper
+# Moved to app/middleware/auth.py — re-exported here for backward compatibility
+from app.middleware.auth import roles_required  # noqa: F401
 
 
 # =============================================================================
@@ -112,6 +83,10 @@ def register_user(email, password, age):
 
         db.session.add(new_user)
         db.session.commit()
+
+        # Auto-create empty profile
+        from app.services.profile_service import create_profile
+        create_profile(new_user.id)
 
         # Send verification email
         send_verification_email(new_user)
@@ -261,6 +236,10 @@ def oauth_google_login(token, age):
 
         db.session.add(new_user)
         db.session.commit()
+
+        # Auto-create empty profile
+        from app.services.profile_service import create_profile
+        create_profile(new_user.id)
 
         access_token = generate_token(new_user)
 

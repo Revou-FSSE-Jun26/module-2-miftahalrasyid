@@ -1,11 +1,12 @@
 import marshmallow as ma
+from app.utils.sanitizer import SanitizeMixin
 
 
 # =============================================================================
 # INPUT SCHEMAS - What the client sends to the server
 # =============================================================================
 
-class RegisterSchema(ma.Schema):
+class RegisterSchema(SanitizeMixin, ma.Schema):
     """Schema for POST /auth/register (normal email+password signup)"""
     email = ma.fields.Email(
         required=True,
@@ -29,7 +30,7 @@ class RegisterSchema(ma.Schema):
     )
 
 
-class LoginSchema(ma.Schema):
+class LoginSchema(SanitizeMixin, ma.Schema):
     """Schema for POST /auth/login (normal email+password login)"""
     email = ma.fields.Email(
         required=True,
@@ -44,7 +45,7 @@ class LoginSchema(ma.Schema):
     )
 
 
-class OAuthGoogleSchema(ma.Schema):
+class OAuthGoogleSchema(SanitizeMixin, ma.Schema):
     """Schema for POST /auth/oauth/google (Google OAuth login/register)"""
     id_token = ma.fields.Str(
         required=True,

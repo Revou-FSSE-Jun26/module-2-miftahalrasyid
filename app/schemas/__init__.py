@@ -3,6 +3,8 @@ from .product_schema import ProductSchema, ProductUpdateSchema, ProductErrorExam
 from .order_schema import OrderSchema, OrderUpdateSchema
 from .order_item_schema import OrderItemSchema, OrderErrorExamples, OrderUpdateSuccessResponseSchema
 from .category_schema import CategorySchema, CategoryUpdateSchema
+from .profile_schema import ProfileSchema, ProfileUpdateSchema
+from .address_schema import AddressSchema, AddressUpdateSchema
 from .auth_schema import (
     RegisterSchema,
     LoginSchema,
@@ -12,13 +14,14 @@ from .auth_schema import (
     AuthErrorExamples,
 )
 import marshmallow as ma
+from app.utils.sanitizer import SanitizeMixin
 
 
 # =============================================================================
 # SHARED SCHEMAS (used across multiple endpoints)
 # =============================================================================
 
-class DeleteActionSchema(ma.Schema):
+class DeleteActionSchema(SanitizeMixin, ma.Schema):
     """
     Shared schema for DELETE requests.
     Optional body: {"action": "hard"} for superadmin hard delete.
@@ -44,6 +47,10 @@ __all__ = [
     "CategorySchema",
     "CategoryUpdateSchema",
     "DeleteActionSchema",
+    "ProfileSchema",
+    "ProfileUpdateSchema",
+    "AddressSchema",
+    "AddressUpdateSchema",
     "UserUpdateFormSchema",
     "UserUpdateSuccessResponseSchema",
     "UserErrorExamples",
