@@ -2,25 +2,49 @@ from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 import marshmallow as ma
 from app.models import Order, OrderStatus
 from app.extensions import db
+from app.utils.sanitizer import SanitizeMixin
 
 
-class OrderSchema(SQLAlchemyAutoSchema):
+class OrderItemInputSchema(ma.Schema):
+    """Schema for a single item in the order creation request."""
+    product_id = ma.fields.Int(
+        required=True,
+        error_messages={"required": "Product ID is required."},
+        metadata={"example": 1}
+    )
+    quantity = ma.fields.Int(
+        required=True,
+        validate=ma.validate.Range(min=1, error="Quantity must be at least 1."),
+        error_messages={
+            "required": "Quantity is required.",
+            "invalid": "'quantity' must be a valid number."
+        },
+        metadata={"example": 2}
+    )
+
+
+class OrderSchema(SanitizeMixin, SQLAlchemyAutoSchema):
     class Meta:
         model = Order
-        load_instance = True         # Convert input directly into an Order Model object
+        load_instance = True
         sqla_session = db.session
-        include_fk = True            # Detect user_id (buyer)
+        include_fk = True
         include_relationships = False
 
-    # --- Input Validation & Custom Error Messages ---
-    name = ma.fields.Str(required=True, error_messages={"required": "Order name is not provided."})
+    # --- Input Validation ---
+    name = ma.fields.Str(
+        required=True,
+        error_messages={"required": "Order name is not provided."},
+        metadata={"example": "my weekend order"}
+    )
 
     # --- Items: list of {product_id, quantity} for creating an order ---
     items = ma.fields.List(
-        ma.fields.Dict(keys=ma.fields.Str(), values=ma.fields.Raw()),
+        ma.fields.Nested(OrderItemInputSchema),
         required=True,
         load_only=True,
-        error_messages={"required": "Order items are required."}
+        error_messages={"required": "Order items are required."},
+        metadata={"example": [{"product_id": 1, "quantity": 2}, {"product_id": 3, "quantity": 1}]}
     )
 
     # --- dump_only: server-generated ---
@@ -39,7 +63,7 @@ class OrderSchema(SQLAlchemyAutoSchema):
         return data
 
 
-class OrderUpdateSchema(ma.Schema):
+class OrderUpdateSchema(SanitizeMixin, ma.Schema):
     """Schema for updating an order (status transitions by seller/admin/superadmin)."""
     status = ma.fields.Str(
         required=False,

@@ -20,31 +20,47 @@ order_bp = Blueprint(
 @order_bp.route('/')
 class OrdersRoot(MethodView):
 
-    @order_bp.doc(security=[{"BearerAuth": []}])
+    @order_bp.doc(security=[{"BearerAuth": []}], responses={
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+    })
     @order_bp.response(200, OrderSchema(many=True))
     @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     def get(self):
-        """Retrieve orders (filtered by role: buyer=own, seller=their products, admin=all)"""
+        """Retrieve orders. Supports ?page=1&per_page=10 (max 30)."""
         roles = get_jwt()['roles']
         jwt_user_id = get_jwt_identity()
 
-        orders = get_all_orders(jwt_user_id, roles)
-        if orders is None:
+        result = get_all_orders(jwt_user_id, roles)
+        if result is None:
             return jsonify({"success": False, "message": "Failed to retrieve orders"}), 400
 
         # Filter fields by role
         allowed = get_allowed_fields("orders", roles, "read")
         data = []
-        for order in orders:
+        for order in result["items"]:
             order_dict = order.to_dict()
             filtered = {k: v for k, v in order_dict.items() if k in allowed}
-            # Include items summary
             filtered["items"] = get_order_items(order.id)
             data.append(filtered)
 
-        return jsonify({"success": True, "message": "Get orders successful", "data": data}), 200
+        return jsonify({
+            "success": True,
+            "message": "Get orders successful",
+            "data": data,
+            "pagination": {
+                "page": result["page"],
+                "per_page": result["per_page"],
+                "total": result["count"],
+            }
+        }), 200
 
-    @order_bp.doc(security=[{"BearerAuth": []}])
+    @order_bp.doc(security=[{"BearerAuth": []}], responses={
+        "400": {"description": "Business logic validation failed"},
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+        "422": {"description": "Input validation failed"},
+    })
     @order_bp.arguments(OrderSchema, location="json")
     @roles_required(UserRole.BUYER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @order_bp.response(201, OrderSchema)
@@ -73,7 +89,11 @@ class OrdersRoot(MethodView):
 @order_bp.route('/<int:id>')
 class OrderDetail(MethodView):
 
-    @order_bp.doc(security=[{"BearerAuth": []}])
+    @order_bp.doc(security=[{"BearerAuth": []}], responses={
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+        "404": {"description": "Resource not found"},
+    })
     @order_bp.response(200, OrderSchema)
     @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     def get(self, id):
@@ -92,7 +112,13 @@ class OrderDetail(MethodView):
 
         return jsonify({"success": True, "message": "Get order detail successful", "data": filtered}), 200
 
-    @order_bp.doc(security=[{"BearerAuth": []}])
+    @order_bp.doc(security=[{"BearerAuth": []}], responses={
+        "400": {"description": "Business logic validation failed"},
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+        "404": {"description": "Resource not found"},
+        "422": {"description": "Input validation failed"},
+    })
     @order_bp.arguments(OrderUpdateSchema, location="json")
     @roles_required(UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @order_bp.response(200, OrderSchema)
@@ -113,7 +139,12 @@ class OrderDetail(MethodView):
         else:
             return jsonify({"success": False, "message": "Failed to update order"}), 400
 
-    @order_bp.doc(security=[{"BearerAuth": []}])
+    @order_bp.doc(security=[{"BearerAuth": []}], responses={
+        "400": {"description": "Delete operation failed"},
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+        "404": {"description": "Resource not found"},
+    })
     @order_bp.arguments(DeleteActionSchema, location="json")
     @roles_required(UserRole.BUYER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @order_bp.response(200, OrderSchema)
@@ -125,10 +156,51 @@ class OrderDetail(MethodView):
 
         result = delete_order(id, jwt_user_id, roles, action)
 
-        if isinstance(result, ValidationResponse):
-            abort(400, message=result.message)
+        if not result.success:
+            return jsonify({"success": False, "message": result.message}), result.status_code
 
-        if result:
-            return jsonify({"success": True, "message": result["message"]}), 200
-        else:
-            return jsonify({"success": False, "message": "Failed to delete order"}), 400
+        return jsonify({"success": True, "message": result.message}), result.status_code
+
+
+@order_bp.route('/<int:id>/products')
+class OrderProducts(MethodView):
+
+    @order_bp.doc(security=[{"BearerAuth": []}], responses={
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+        "404": {"description": "Resource not found"},
+    })
+    @order_bp.response(200, OrderSchema)
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    def get(self, id):
+        """Get full product details for all items in an order (with ownership check)."""
+        from app.models import Product
+        from app.models.order_items_model import Order_item
+
+        roles = get_jwt()['roles']
+        jwt_user_id = get_jwt_identity()
+
+        order = get_order_by_id(id, jwt_user_id, roles)
+        if not order:
+            abort(404, message="Order not found")
+
+        # Get order items with full product details
+        items = Order_item.query.filter(
+            Order_item.order_id == id,
+            Order_item.deleted_at.is_(None)
+        ).all()
+
+        products_data = []
+        for item in items:
+            product = Product.query.get(item.product_id)
+            if product:
+                product_info = product.to_dict()
+                product_info["quantity"] = item.quantity
+                product_info["compound_price"] = float(item.compound_price)
+                products_data.append(product_info)
+
+        return jsonify({
+            "success": True,
+            "message": f"Products in order {id}",
+            "data": products_data
+        }), 200

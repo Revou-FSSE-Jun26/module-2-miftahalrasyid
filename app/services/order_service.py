@@ -9,34 +9,33 @@ from . import ValidationResponse
 
 def get_all_orders(jwt_user_id, roles):
     """
-    Get orders based on role:
+    Get orders based on role with pagination.
     - Admin/Superadmin: all orders (not soft-deleted)
     - Seller: orders containing their products
     - Buyer: only their own orders
     """
+    from app.utils.pagination import paginate_query
     try:
         is_admin = any(r in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) for r in roles)
 
         if is_admin:
-            orders = Order.query.filter(Order.deleted_at.is_(None)).all()
+            query = Order.query.filter(Order.deleted_at.is_(None))
         elif UserRole.SELLER.value in roles:
-            # Orders that contain at least one product owned by this seller
-            orders = Order.query.filter(
+            query = Order.query.filter(
                 Order.deleted_at.is_(None),
                 Order.id.in_(
                     db.session.query(Order_item.order_id).join(
                         Product, Order_item.product_id == Product.id
                     ).filter(Product.user_id == int(jwt_user_id))
                 )
-            ).all()
+            )
         else:
-            # Buyer: own orders only
-            orders = Order.query.filter(
+            query = Order.query.filter(
                 Order.deleted_at.is_(None),
                 Order.user_id == int(jwt_user_id)
-            ).all()
+            )
 
-        return orders
+        return paginate_query(query)
     except Exception as e:
         logging.error(f"Failed to retrieve orders: {str(e)}")
         return None
@@ -153,7 +152,22 @@ def create_order(order_instance, items_data, jwt_user_id, roles):
                 "product": product
             })
 
-        order_instance.total = total
+        # Calculate pricing: subtotal → discount → tax → total
+        from flask import current_app
+        subtotal = total
+        discount_percent = 0  # TODO: apply coupon/promo logic here
+        discount_amount = round(subtotal * (discount_percent / 100), 2)
+        after_discount = subtotal - discount_amount
+        tax_percent = current_app.config.get('TAX_PERCENT', 11)
+        tax_amount = round(after_discount * (tax_percent / 100), 2)
+        final_total = round(after_discount + tax_amount, 2)
+
+        order_instance.subtotal = subtotal
+        order_instance.discount_percent = discount_percent
+        order_instance.discount_amount = discount_amount
+        order_instance.tax_percent = tax_percent
+        order_instance.tax_amount = tax_amount
+        order_instance.total = final_total
 
         # Save order first to get order.id
         db.session.add(order_instance)
@@ -297,12 +311,12 @@ def delete_order(order_id, jwt_user_id, roles, action="soft"):
         order = Order.query.filter(Order.id == order_id).first()
 
         if not order:
-            return ValidationResponse(success=False, message="Order not found")
+            return ValidationResponse(success=False, message="Order not found", status_code=404)
 
         # Check delete permission
         delete_policy = get_delete_policy("orders", roles)
         if delete_policy is None:
-            return ValidationResponse(success=False, message="Your role does not have permission to delete orders")
+            return ValidationResponse(success=False, message="Your role does not have permission to delete orders", status_code=403)
 
         # Authorization
         is_admin = any(r in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) for r in roles)
@@ -310,24 +324,38 @@ def delete_order(order_id, jwt_user_id, roles, action="soft"):
         if not is_admin:
             # Buyer can only cancel own PAID orders
             if order.user_id != int(jwt_user_id):
-                return ValidationResponse(success=False, message="Unauthorized to delete this order")
+                return ValidationResponse(success=False, message="Unauthorized to delete this order", status_code=403)
             if order.status != OrderStatus.PAID:
-                return ValidationResponse(success=False, message="Can only cancel orders with PAID status")
+                return ValidationResponse(success=False, message="Can only cancel orders with PAID status", status_code=400)
+
+        # Verify all products in this order still exist (not hard-deleted)
+        order_items_list = Order_item.query.filter(
+            Order_item.order_id == order_id,
+            Order_item.deleted_at.is_(None)
+        ).all()
+        for item in order_items_list:
+            product = Product.query.get(item.product_id)
+            if product is None:
+                return ValidationResponse(
+                    success=False,
+                    message=f"Unable to process this order deletion. Product (ID: {item.product_id}) has been permanently removed from the system. Please contact an administrator.",
+                    status_code=409
+                )
 
         # Hard delete: only superadmin with action="hard"
         if action == "hard":
             if delete_policy != "hard":
-                return ValidationResponse(success=False, message="Only superadmin can perform hard delete")
+                return ValidationResponse(success=False, message="Only superadmin can perform hard delete", status_code=403)
             # Restore stock before hard delete
             _restore_stock(order_id)
             db.session.delete(order)
             db.session.commit()
             logging.info(f"Order hard-deleted: {order_id}")
-            return {"message": f"Order {order_id} permanently deleted"}
+            return ValidationResponse(success=True, message=f"Order {order_id} permanently deleted", status_code=200)
 
         # Soft delete (default)
         if order.deleted_at is not None:
-            return ValidationResponse(success=False, message="Order is already deleted")
+            return ValidationResponse(success=False, message="Order is already deleted", status_code=400)
 
         # Restore stock on cancellation if order is PAID
         if order.status == OrderStatus.PAID:
@@ -336,12 +364,16 @@ def delete_order(order_id, jwt_user_id, roles, action="soft"):
         order.deleted_at = func.now()
         db.session.commit()
         logging.info(f"Order soft-deleted: {order_id}")
-        return {"message": f"Order {order_id} soft-deleted"}
+        return ValidationResponse(success=True, message=f"Order {order_id} soft-deleted", status_code=200)
 
+    except IntegrityError as e:
+        db.session.rollback()
+        logging.error(f"Integrity error deleting order {order_id}: {str(e)}")
+        return ValidationResponse(success=False, message="Cannot delete this order due to database integrity constraints.", status_code=409)
     except Exception as e:
         db.session.rollback()
         logging.error(f"Failed to delete order {order_id}: {str(e)}")
-        return None
+        return ValidationResponse(success=False, message="An unexpected error occurred while deleting the order.", status_code=500)
 
 
 # =============================================================================
