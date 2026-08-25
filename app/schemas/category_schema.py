@@ -2,14 +2,15 @@ from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 import marshmallow as ma
 from app.models import Category
 from app.extensions import db
+from app.utils.sanitizer import SanitizeMixin
 
 
-class CategorySchema(SQLAlchemyAutoSchema):
+class CategorySchema(SanitizeMixin, SQLAlchemyAutoSchema):
     class Meta:
         model = Category
         load_instance = True         # Convert input directly into a Category Model object
         sqla_session = db.session
-        include_relationships = True # Auto-detect Many-to-Many Product relationship (category_items)
+        include_relationships = False
 
     # --- Input Validation & Custom Error Messages ---
     name = ma.fields.Str(required=True, error_messages={"required": "Category name is not provided."})
@@ -26,7 +27,7 @@ class CategorySchema(SQLAlchemyAutoSchema):
         return data
 
 
-class CategoryUpdateSchema(SQLAlchemyAutoSchema):
+class CategoryUpdateSchema(SanitizeMixin, SQLAlchemyAutoSchema):
     class Meta:
         model = Category
         load_instance = False        # Return dict, not model instance

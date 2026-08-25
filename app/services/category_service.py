@@ -8,11 +8,13 @@ from . import ValidationResponse
 
 def get_all_categories():
     """
-    Get all active categories (deleted_at is null).
+    Get all active categories with pagination.
+    Reads ?page and ?per_page from query params.
     """
+    from app.utils.pagination import paginate_query
     try:
-        categories = Category.query.filter(Category.deleted_at.is_(None)).all()
-        return categories
+        query = Category.query.filter(Category.deleted_at.is_(None))
+        return paginate_query(query)
     except Exception as e:
         logging.error(f"Failed to retrieve categories: {str(e)}")
         return None
@@ -145,31 +147,35 @@ def delete_category(category_id, roles, action="soft"):
         category = Category.query.filter(Category.id == category_id).first()
 
         if not category:
-            return ValidationResponse(success=False, message="Category not found")
+            return ValidationResponse(success=False, message="Category not found", status_code=404)
 
         # Check delete permission
         delete_policy = get_delete_policy("categories", roles)
         if delete_policy is None:
-            return ValidationResponse(success=False, message="Your role does not have permission to delete categories")
+            return ValidationResponse(success=False, message="Your role does not have permission to delete categories", status_code=403)
 
         # Hard delete: only if role policy allows "hard" AND action requested is "hard"
         if action == "hard":
             if delete_policy != "hard":
-                return ValidationResponse(success=False, message="Only superadmin can perform hard delete")
+                return ValidationResponse(success=False, message="Only superadmin can perform hard delete", status_code=403)
             db.session.delete(category)
             db.session.commit()
             logging.info(f"Category hard-deleted: {category_id}")
-            return {"message": f"Category {category_id} permanently deleted"}
+            return ValidationResponse(success=True, message=f"Category {category_id} permanently deleted", status_code=200)
 
         # Soft delete (default)
         if category.deleted_at is not None:
-            return ValidationResponse(success=False, message="Category is already deleted")
+            return ValidationResponse(success=False, message="Category is already deleted", status_code=400)
         category.deleted_at = func.now()
         db.session.commit()
         logging.info(f"Category soft-deleted: {category_id}")
-        return {"message": f"Category {category_id} soft-deleted"}
+        return ValidationResponse(success=True, message=f"Category {category_id} soft-deleted", status_code=200)
 
+    except IntegrityError as e:
+        db.session.rollback()
+        logging.error(f"Integrity error deleting category {category_id}: {str(e)}")
+        return ValidationResponse(success=False, message="Cannot delete this category due to database integrity constraints.", status_code=409)
     except Exception as e:
         db.session.rollback()
         logging.error(f"Failed to delete category {category_id}: {str(e)}")
-        return None
+        return ValidationResponse(success=False, message="An unexpected error occurred while deleting the category.", status_code=500)

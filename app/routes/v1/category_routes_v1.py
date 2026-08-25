@@ -19,11 +19,14 @@ category_bp = Blueprint(
 @category_bp.route('/')
 class CategoriesRoot(MethodView):
 
+    @category_bp.doc(responses={
+        "400": {"description": "Business logic validation failed"},
+    })
     @category_bp.response(200, CategorySchema(many=True))
     def get(self):
-        """Retrieve all categories (public, filtered by role if authenticated)"""
-        categories = get_all_categories()
-        if categories is None:
+        """Retrieve all categories. Supports ?page=1&per_page=10 (max 30)."""
+        result = get_all_categories()
+        if result is None:
             return jsonify({"success": False, "message": "Failed to retrieve categories"}), 400
 
         # Default read fields for unauthenticated users (same as buyer)
@@ -39,12 +42,26 @@ class CategoriesRoot(MethodView):
 
         data = [
             {k: v for k, v in cat.__dict__.items() if k in allowed and not k.startswith('_')}
-            for cat in categories
+            for cat in result["items"]
         ]
 
-        return jsonify({"success": True, "message": "Get all categories successful", "data": data}), 200
+        return jsonify({
+            "success": True,
+            "message": "Get all categories successful",
+            "data": data,
+            "pagination": {
+                "page": result["page"],
+                "per_page": result["per_page"],
+                "total": result["count"],
+            }
+        }), 200
 
-    @category_bp.doc(security=[{"BearerAuth": []}])
+    @category_bp.doc(security=[{"BearerAuth": []}], responses={
+        "400": {"description": "Business logic validation failed"},
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+        "422": {"description": "Input validation failed"},
+    })
     @category_bp.arguments(CategorySchema, location="json")
     @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @category_bp.response(201, CategorySchema)
@@ -66,6 +83,9 @@ class CategoriesRoot(MethodView):
 @category_bp.route('/<int:id>')
 class CategoryDetail(MethodView):
 
+    @category_bp.doc(responses={
+        "404": {"description": "Resource not found"},
+    })
     @category_bp.response(200, CategorySchema)
     def get(self, id):
         """Retrieve category detail by ID"""
@@ -93,7 +113,13 @@ class CategoryDetail(MethodView):
 
         return jsonify({"success": True, "message": "Get category detail successful", "data": data}), 200
 
-    @category_bp.doc(security=[{"BearerAuth": []}])
+    @category_bp.doc(security=[{"BearerAuth": []}], responses={
+        "400": {"description": "Business logic validation failed"},
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+        "404": {"description": "Resource not found"},
+        "422": {"description": "Input validation failed"},
+    })
     @category_bp.arguments(CategoryUpdateSchema, location="json")
     @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @category_bp.response(200, CategorySchema)
@@ -111,7 +137,12 @@ class CategoryDetail(MethodView):
         else:
             return jsonify({"success": False, "message": "Failed to update category"}), 400
 
-    @category_bp.doc(security=[{"BearerAuth": []}])
+    @category_bp.doc(security=[{"BearerAuth": []}], responses={
+        "400": {"description": "Delete operation failed"},
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+        "404": {"description": "Resource not found"},
+    })
     @category_bp.arguments(DeleteActionSchema, location="json")
     @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @category_bp.response(200, CategorySchema)
@@ -122,10 +153,43 @@ class CategoryDetail(MethodView):
 
         result = delete_category(id, roles, action)
 
-        if isinstance(result, ValidationResponse):
-            abort(400, message=result.message)
+        if not result.success:
+            return jsonify({"success": False, "message": result.message}), result.status_code
 
-        if result:
-            return jsonify({"success": True, "message": result["message"]}), 200
-        else:
-            return jsonify({"success": False, "message": "Failed to delete category"}), 400
+        return jsonify({"success": True, "message": result.message}), result.status_code
+
+
+@category_bp.route('/<int:id>/products')
+class CategoryProducts(MethodView):
+
+    @category_bp.doc(responses={
+        "404": {"description": "Resource not found"},
+    })
+    @category_bp.response(200, CategorySchema)
+    def get(self, id):
+        """Get all active products under a specific category (public)."""
+        from app.models import Product, Category
+        from app.utils.pagination import paginate_query
+
+        category = get_category_by_id(id)
+        if not category:
+            abort(404, message="Category not found")
+
+        query = Product.query.filter(
+            Product.deleted_at.is_(None),
+            Product.is_active == True,
+            Product.categories.any(Category.id == id)
+        )
+
+        result = paginate_query(query)
+
+        return jsonify({
+            "success": True,
+            "message": f"Products in category '{category.name}'",
+            "data": [p.to_dict() for p in result["items"]],
+            "pagination": {
+                "page": result["page"],
+                "per_page": result["per_page"],
+                "total": result["count"],
+            }
+        }), 200

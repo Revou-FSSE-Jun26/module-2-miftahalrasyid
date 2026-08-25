@@ -12,3 +12,14 @@ class Category(db.Model):
     name       = db.Column(db.String(150), unique=True, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
     deleted_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    def to_dict(self, allowed_fields=None):
+        data = {
+            "id"        : self.id,
+            "name"      : self.name,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
+        }
+        if allowed_fields:
+            return {k: v for k, v in data.items() if k in allowed_fields}
+        return data
