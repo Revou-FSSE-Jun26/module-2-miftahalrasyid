@@ -116,4 +116,26 @@ FIELD_PERMISSIONS = {
             "delete": "soft",
         },
     },
+    "uploads": {
+        "SUPERADMIN": {
+            "create": {"products"},
+            "delete": "hard",
+            "bypass_ownership": True,
+        },
+        "ADMIN": {
+            "create": set(),
+            "delete": "hard",
+            "bypass_ownership": True,
+        },
+        "SELLER": {
+            "create": {"products"},
+            "delete": "hard",
+            "bypass_ownership": False,
+        },
+        "BUYER": {
+            "create": set(),
+            "delete": None,
+            "bypass_ownership": False,
+        },
+    },
 }
