@@ -82,8 +82,8 @@ class User(db.Model):
         if self.provider == AuthProvider.PASSWORD_HASH:
             self.password = password
 
-    def to_dict(self):
-        return {
+    def to_dict(self, allowed_fields=None):
+        data = {
             "id"          : self.id,
             "username"    : self.username,
             "roles"        : [r.value for r in self.roles] if self.roles else [],
@@ -91,6 +91,8 @@ class User(db.Model):
             "age"         : self.age,
             "is_active"   : self.is_active,
             "provider"    : self.provider.value if self.provider else None,
-            "provider_key": self.provider_key,
-            "created_at"  : self.created_at.isoformat() if self.created_at else None
+            "created_at"  : self.created_at.isoformat() if self.created_at else None,
         }
+        if allowed_fields:
+            return {k: v for k, v in data.items() if k in allowed_fields}
+        return data

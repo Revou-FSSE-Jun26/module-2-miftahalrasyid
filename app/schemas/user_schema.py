@@ -2,9 +2,10 @@ from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 import marshmallow as ma
 from app.models import User
 from app.extensions import db
+from app.utils.sanitizer import SanitizeMixin
 
 
-class UserSchema(SQLAlchemyAutoSchema):
+class UserSchema(SanitizeMixin, SQLAlchemyAutoSchema):
     class Meta:
         model = User
         load_instance = True       # Smorest auto-creates a Model object from input

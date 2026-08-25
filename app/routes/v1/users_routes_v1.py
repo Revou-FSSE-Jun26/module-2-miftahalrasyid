@@ -4,7 +4,7 @@ from flask_smorest import Blueprint, abort
 from flask_jwt_extended import get_jwt_identity, get_jwt
 from app.services.auth_service import roles_required
 from app.models import UserRole
-from app.schemas import UserSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples, DeleteActionSchema
+from app.schemas import UserSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples, DeleteActionSchema, ProfileUpdateSchema
 from app.permissions.field_filter import get_delete_policy
 from app.services.user_service import (
     get_all_users,
@@ -15,6 +15,7 @@ from app.services.user_service import (
     become_seller,
     ValidationResponse
 )
+from app.services.profile_service import get_profile_by_user_id, update_profile
 
 users_bp = Blueprint(
     'users',
@@ -31,11 +32,20 @@ class UsersRoot(MethodView):
     @users_bp.response(200, UserSchema(many=True))
     @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     def get(self):
-        """Show all users where deleted_at is None"""
-        all_users = get_all_users()
-        if all_users is None:
+        """Show all users. Supports ?page=1&per_page=10 (max 30)."""
+        result = get_all_users()
+        if result is None:
             abort(500, message="Failed to retrieve data from database.")
-        return jsonify({"success":True,"message":"show all users succssfull","data":all_users}),200
+        return jsonify({
+            "success": True,
+            "message": "show all users successful",
+            "data": [user.to_dict() for user in result["items"]],
+            "pagination": {
+                "page": result["page"],
+                "per_page": result["per_page"],
+                "total": result["count"],
+            }
+        }), 200
 
     @users_bp.doc(responses=UserErrorExamples.RESPONSES_POST_USER, security=[{"BearerAuth": []}])
     @users_bp.arguments(UserSchema, location="json")
@@ -55,11 +65,16 @@ class UserDetail(MethodView):
 
     @users_bp.response(200, UserSchema)
     def get(self, id):
-        """Get user detail by ID"""
+        """Get public user profile by ID (username only)."""
         user_data = get_user_by(id)
         if not user_data:
-            abort(404, messages="User not found.")
-        return user_data
+            abort(404, message="User not found.")
+        # Public fields only
+        return jsonify({
+            "success": True,
+            "message": "User profile",
+            "data": {"id": user_data.id, "username": user_data.username}
+        }), 200
 
     @users_bp.doc(responses=UserErrorExamples.RESPONSES_PUT_USER, security=[{"BearerAuth": []}])
     @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
@@ -120,13 +135,10 @@ class UserDetail(MethodView):
 
         result = delete_user(id, caller_roles, action)
 
-        if isinstance(result, ValidationResponse):
-            abort(400, message=result.message)
+        if not result.success:
+            return jsonify({"success": False, "message": result.message}), result.status_code
 
-        if result:
-            return jsonify({"success": True, "message": result["message"]}), 200
-        else:
-            return jsonify({"success": False, "message": "Failed to delete user"}), 400
+        return jsonify({"success": True, "message": result.message}), result.status_code
 
 
 @users_bp.route('/become-seller')
@@ -147,3 +159,173 @@ class UserBecomeSeller(MethodView):
             abort(400, message=result.message)
 
         return result
+
+
+@users_bp.route('/me')
+class UserMe(MethodView):
+
+    @users_bp.doc(security=[{"BearerAuth": []}])
+    @users_bp.response(200)
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    def get(self):
+        """Get the authenticated user's full profile (user data + profile)."""
+        current_user_id = int(get_jwt_identity())
+        user = get_user_by(current_user_id)
+        if not user:
+            abort(404, message="User not found.")
+
+        profile = get_profile_by_user_id(current_user_id)
+
+        data = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "age": user.age,
+            "roles": [r.value for r in user.roles] if user.roles else [],
+            "is_active": user.is_active,
+            "provider": user.provider.value if user.provider else None,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "profile": profile.to_dict() if profile else None,
+        }
+
+        return jsonify({"success": True, "message": "Your profile", "data": data}), 200
+
+
+@users_bp.route('/me/profile')
+class UserMeProfile(MethodView):
+
+    @users_bp.doc(security=[{"BearerAuth": []}])
+    @users_bp.arguments(ProfileUpdateSchema, location="json")
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    def put(self, update_data):
+        """Update the authenticated user's profile (bio, avatar_url, phone)."""
+        current_user_id = int(get_jwt_identity())
+
+        result = update_profile(current_user_id, update_data)
+        if isinstance(result, ValidationResponse):
+            abort(400, message=result.message)
+
+        return jsonify({"success": True, "message": "Profile updated", "data": result.to_dict()}), 200
+
+
+@users_bp.route('/me/addresses')
+class UserMeAddresses(MethodView):
+
+    @users_bp.doc(security=[{"BearerAuth": []}], responses={
+        "401": {"description": "Missing or invalid JWT token"},
+    })
+    @users_bp.response(200)
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    def get(self):
+        """Get all addresses for the authenticated user."""
+        from app.services.address_service import get_addresses_by_user
+
+        current_user_id = int(get_jwt_identity())
+        addresses = get_addresses_by_user(current_user_id)
+
+        if addresses is None:
+            return jsonify({"success": False, "message": "Failed to retrieve addresses"}), 400
+
+        return jsonify({
+            "success": True,
+            "message": "Your addresses",
+            "data": [addr.to_dict() for addr in addresses]
+        }), 200
+
+    @users_bp.doc(security=[{"BearerAuth": []}], responses={
+        "400": {"description": "Maximum addresses reached or validation error"},
+        "401": {"description": "Missing or invalid JWT token"},
+        "422": {"description": "Input validation failed"},
+    })
+    @users_bp.response(201)
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    def post(self):
+        """Create a new address for the authenticated user."""
+        from app.schemas import AddressSchema
+        from app.services.address_service import create_address
+        from marshmallow import ValidationError
+
+        current_user_id = int(get_jwt_identity())
+        schema = AddressSchema()
+
+        try:
+            address_instance = schema.load(request.json)
+        except ValidationError as err:
+            abort(422, message=err.messages)
+
+        result = create_address(current_user_id, address_instance)
+
+        if isinstance(result, ValidationResponse):
+            abort(400, message=result.message)
+
+        return jsonify({"success": True, "message": "Address created", "data": result.to_dict()}), 201
+
+
+@users_bp.route('/me/addresses/<int:address_id>')
+class UserMeAddressDetail(MethodView):
+
+    @users_bp.doc(security=[{"BearerAuth": []}], responses={
+        "401": {"description": "Missing or invalid JWT token"},
+        "404": {"description": "Address not found or does not belong to you"},
+    })
+    @users_bp.response(200)
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    def get(self, address_id):
+        """Get a specific address by ID for the authenticated user."""
+        from app.services.address_service import get_address_by_id
+
+        current_user_id = int(get_jwt_identity())
+        address = get_address_by_id(address_id, current_user_id)
+
+        if not address:
+            abort(404, message="Address not found")
+
+        return jsonify({"success": True, "data": address.to_dict()}), 200
+
+    @users_bp.doc(security=[{"BearerAuth": []}], responses={
+        "400": {"description": "Update failed"},
+        "401": {"description": "Missing or invalid JWT token"},
+        "404": {"description": "Address not found or does not belong to you"},
+        "422": {"description": "Input validation failed"},
+    })
+    @users_bp.response(200)
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    def put(self, address_id):
+        """Update a specific address for the authenticated user."""
+        from app.schemas import AddressUpdateSchema
+        from app.services.address_service import update_address
+        from marshmallow import ValidationError
+
+        current_user_id = int(get_jwt_identity())
+        schema = AddressUpdateSchema()
+
+        try:
+            update_data = schema.load(request.json)
+        except ValidationError as err:
+            abort(422, message=err.messages)
+
+        result = update_address(address_id, current_user_id, update_data)
+
+        if isinstance(result, ValidationResponse):
+            abort(400, message=result.message)
+
+        return jsonify({"success": True, "message": "Address updated", "data": result.to_dict()}), 200
+
+    @users_bp.doc(security=[{"BearerAuth": []}], responses={
+        "400": {"description": "Delete failed"},
+        "401": {"description": "Missing or invalid JWT token"},
+        "404": {"description": "Address not found or does not belong to you"},
+    })
+    @users_bp.response(200)
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    def delete(self, address_id):
+        """Delete a specific address for the authenticated user."""
+        from app.services.address_service import delete_address
+
+        current_user_id = int(get_jwt_identity())
+        result = delete_address(address_id, current_user_id)
+
+        if not result.success:
+            return jsonify({"success": False, "message": result.message}), 400
+
+        return jsonify({"success": True, "message": result.message}), 200

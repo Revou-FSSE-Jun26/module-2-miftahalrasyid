@@ -11,12 +11,13 @@ from . import ValidationResponse
 
 def get_all_users():
     """
-    Retrieve all users from the database where deleted_at is None.
-    Includes error handling for database connection issues.
+    Retrieve all users with pagination.
+    Reads ?page and ?per_page from query params.
     """
+    from app.utils.pagination import paginate_query
     try:
-        users = User.query.filter(User.deleted_at.is_(None)).all()
-        return [user.to_dict() for user in users]
+        query = User.query.filter(User.deleted_at.is_(None))
+        return paginate_query(query)
     except Exception as e:
         logging.error(f"Failed to retrieve users: {str(e)}")
         return None
@@ -33,27 +34,6 @@ def get_user_by(id):
     except Exception as e:
         logging.error(f"Failed to retrieve user ID {id}: {str(e)}")
         return None
-
-
-def delete_user_by(id):
-    """
-    Soft-delete a user by setting deleted_at timestamp.
-    """
-    try:
-        user = User.query.get(id)
-        if user is None:
-            return ValidationResponse(success=False, message="User not found.")
-
-        if user.deleted_at is None:
-            user.deleted_at = func.now()
-            db.session.commit()
-            return user
-        else:
-            return ValidationResponse(success=False, message="This user account is already deactivated.")
-    except Exception as e:
-        db.session.rollback()
-        logging.error(f"Unexpected error during delete on id:{id}: {str(e)}")
-        return ValidationResponse(success=False, message="Unexpected error during delete.")
 
 
 def delete_user(user_id, caller_roles, action="soft"):
@@ -75,33 +55,37 @@ def delete_user(user_id, caller_roles, action="soft"):
     try:
         user = User.query.get(user_id)
         if user is None:
-            return ValidationResponse(success=False, message="User not found.")
+            return ValidationResponse(success=False, message="User not found.", status_code=404)
 
         delete_policy = get_delete_policy("users", caller_roles)
         if delete_policy is None:
-            return ValidationResponse(success=False, message="Your role does not have permission to delete users.")
+            return ValidationResponse(success=False, message="Your role does not have permission to delete users.", status_code=403)
 
         # Hard delete: only if role policy allows "hard" AND action requested is "hard"
         if action == "hard":
             if delete_policy != "hard":
-                return ValidationResponse(success=False, message="Only superadmin can perform hard delete")
+                return ValidationResponse(success=False, message="Only superadmin can perform hard delete", status_code=403)
             db.session.delete(user)
             db.session.commit()
             logging.info(f"User hard-deleted: {user_id}")
-            return {"message": f"User {user_id} permanently deleted"}
+            return ValidationResponse(success=True, message=f"User {user_id} permanently deleted", status_code=200)
 
         # Soft delete (default)
         if user.deleted_at is not None:
-            return ValidationResponse(success=False, message="This user account is already deactivated.")
+            return ValidationResponse(success=False, message="This user account is already deactivated.", status_code=400)
         user.deleted_at = func.now()
         db.session.commit()
         logging.info(f"User soft-deleted: {user_id}")
-        return {"message": f"User {user_id} soft-deleted"}
+        return ValidationResponse(success=True, message=f"User {user_id} soft-deleted", status_code=200)
 
+    except IntegrityError as e:
+        db.session.rollback()
+        logging.error(f"Integrity error deleting user {user_id}: {str(e)}")
+        return ValidationResponse(success=False, message="Cannot delete this user due to database integrity constraints.", status_code=409)
     except Exception as e:
         db.session.rollback()
         logging.error(f"Failed to delete user {user_id}: {str(e)}")
-        return ValidationResponse(success=False, message="Unexpected error during delete.")
+        return ValidationResponse(success=False, message="Unexpected error during delete.", status_code=500)
 
 
 def update_user_by(id, user_instance, caller_roles=None):
