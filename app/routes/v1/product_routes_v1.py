@@ -18,16 +18,33 @@ product_bp = Blueprint(
 @product_bp.route('/')
 class ProductsRoot(MethodView):
 
+    @product_bp.doc(responses={
+        "400": {"description": "Business logic validation failed"},
+    })
     @product_bp.response(200, ProductSchema(many=True))
     def get(self):
-        """Retrieve all products"""
-        products_data = get_all_products()
-        if products_data is None:
-            return jsonify({"success":False,"message":"Data is empty"}),400
+        """Retrieve all products. Supports ?page=1&per_page=10 (max 30)."""
+        result = get_all_products()
+        if result is None:
+            return jsonify({"success": False, "message": "Failed to retrieve products"}), 400
         
-        return jsonify({"success":True,"message":"get all products successful","data":products_data}),200
+        return jsonify({
+            "success": True,
+            "message": "get all products successful",
+            "data": [p.to_dict() for p in result["items"]],
+            "pagination": {
+                "page": result["page"],
+                "per_page": result["per_page"],
+                "total": result["count"],
+            }
+        }), 200
 
-    @product_bp.doc(responses=ProductErrorExamples.RESPONSES_POST_PRODUCT,security=[{"BearerAuth": []}])
+    @product_bp.doc(responses={
+        **ProductErrorExamples.RESPONSES_POST_PRODUCT,
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+        "422": {"description": "Input validation failed"},
+    }, security=[{"BearerAuth": []}])
     @product_bp.arguments(ProductSchema, location="json")
     @roles_required(UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @product_bp.response(201, ProductSchema)
@@ -50,6 +67,9 @@ class ProductsRoot(MethodView):
 @product_bp.route('/<int:id>')
 class ProductDetail(MethodView):
 
+    @product_bp.doc(responses={
+        "404": {"description": "Resource not found"},
+    })
     @product_bp.response(200, ProductSchema)
     def get(self, id):
         """Retrieve product detail by ID"""
@@ -60,7 +80,13 @@ class ProductDetail(MethodView):
 
         return jsonify({"success": True, "message": "get product detail successful", "data": product.to_dict()}), 200
 
-    @product_bp.doc(security=[{"BearerAuth": []}])
+    @product_bp.doc(security=[{"BearerAuth": []}], responses={
+        "400": {"description": "Business logic validation failed"},
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+        "404": {"description": "Resource not found"},
+        "422": {"description": "Input validation failed"},
+    })
     @product_bp.arguments(ProductUpdateSchema, location="json")
     @roles_required(UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @product_bp.response(200, ProductSchema)
@@ -80,7 +106,12 @@ class ProductDetail(MethodView):
         else:
             return jsonify({"success": False, "message": "Failed to update product"}), 400
 
-    @product_bp.doc(security=[{"BearerAuth": []}])
+    @product_bp.doc(security=[{"BearerAuth": []}], responses={
+        "400": {"description": "Delete operation failed"},
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+        "404": {"description": "Resource not found"},
+    })
     @product_bp.arguments(DeleteActionSchema, location="json")
     @roles_required(UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @product_bp.response(200, ProductSchema)
@@ -92,10 +123,7 @@ class ProductDetail(MethodView):
 
         result = delete_product(id, jwt_user_id, roles, action)
 
-        if isinstance(result, ValidationResponse):
-            abort(400, message=result.message)
+        if not result.success:
+            return jsonify({"success": False, "message": result.message}), result.status_code
 
-        if result:
-            return jsonify({"success": True, "message": result["message"]}), 200
-        else:
-            return jsonify({"success": False, "message": "Failed to delete product"}), 400
+        return jsonify({"success": True, "message": result.message}), result.status_code

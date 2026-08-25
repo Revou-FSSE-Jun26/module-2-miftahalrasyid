@@ -10,12 +10,13 @@ from . import ValidationResponse
     
 def get_all_products():
     """
-        Get all active products for buyer to browse (deleted_at is null and is_active is true)
+    Get all active products with pagination.
+    Reads ?page and ?per_page from query params.
     """
+    from app.utils.pagination import paginate_query
     try:
         query = Product.query.filter(Product.deleted_at.is_(None)).filter_by(is_active=True)
-        pagination = query.paginate(page=1, per_page=10, max_per_page=20, error_out=True, count=True)
-        return [product.to_dict() for product in pagination.items]
+        return paginate_query(query)
     except Exception as e:
         logging.error(f"Failed to retrieve products: {str(e)}")
         return None
@@ -168,7 +169,7 @@ def delete_product(product_id, jwt_user_id, roles, action="soft"):
     Delete a product by ID.
     Default = soft delete (set deleted_at).
     Superadmin can pass action="hard" to permanently remove.
-    Seller can only soft-delete own products (TODO: check no pending orders).
+    Blocks deletion if product is linked to active (PAID) orders.
     
     Args:
         product_id: Product ID to delete
@@ -185,43 +186,57 @@ def delete_product(product_id, jwt_user_id, roles, action="soft"):
         product = Product.query.filter(Product.id == product_id).first()
 
         if not product:
-            return ValidationResponse(success=False, message="Product not found")
+            return ValidationResponse(success=False, message="Product not found", status_code=404)
 
         # Check delete permission
         delete_policy = get_delete_policy("products", roles)
         if delete_policy is None:
-            return ValidationResponse(success=False, message="Your role does not have permission to delete products")
+            return ValidationResponse(success=False, message="Your role does not have permission to delete products", status_code=403)
 
         # Authorization: owner or admin/superadmin
         is_admin = any(r in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) for r in roles)
         if product.user_id != int(jwt_user_id) and not is_admin:
-            return ValidationResponse(success=False, message="Unauthorized to delete this product")
+            return ValidationResponse(success=False, message="Unauthorized to delete this product", status_code=403)
+
+        # Block deletion if product is linked to active (PAID) orders
+        from app.models.order_model import Order, OrderStatus
+        from app.models.order_items_model import Order_item
+        active_order_count = Order_item.query.join(
+            Order, Order_item.order_id == Order.id
+        ).filter(
+            Order_item.product_id == product_id,
+            Order.status == OrderStatus.PAID,
+            Order.deleted_at.is_(None)
+        ).count()
+        if active_order_count > 0:
+            return ValidationResponse(
+                success=False,
+                message=f"Unable to delete this product. It is linked to {active_order_count} active order(s) awaiting fulfillment. Please complete or cancel those orders first.",
+                status_code=409
+            )
 
         # Hard delete: only if role policy allows "hard" AND action requested is "hard"
         if action == "hard":
             if delete_policy != "hard":
-                return ValidationResponse(success=False, message="Only superadmin can perform hard delete")
+                return ValidationResponse(success=False, message="Only superadmin can perform hard delete", status_code=403)
             db.session.delete(product)
             db.session.commit()
             logging.info(f"Product hard-deleted: {product_id}")
-            return {"message": f"Product {product_id} permanently deleted"}
+            return ValidationResponse(success=True, message=f"Product {product_id} permanently deleted", status_code=200)
 
         # Soft delete (default)
         if product.deleted_at is not None:
-            return ValidationResponse(success=False, message="Product is already deleted")
+            return ValidationResponse(success=False, message="Product is already deleted", status_code=400)
         product.deleted_at = func.now()
         db.session.commit()
         logging.info(f"Product soft-deleted: {product_id}")
-        return {"message": f"Product {product_id} soft-deleted"}
+        return ValidationResponse(success=True, message=f"Product {product_id} soft-deleted", status_code=200)
 
+    except IntegrityError as e:
+        db.session.rollback()
+        logging.error(f"Integrity error deleting product {product_id}: {str(e)}")
+        return ValidationResponse(success=False, message="Cannot delete this product due to database integrity constraints. It may still be referenced by other records.", status_code=409)
     except Exception as e:
         db.session.rollback()
         logging.error(f"Failed to delete product {product_id}: {str(e)}")
-        return None
-
-
-def get_products_by_user(id):
-    """
-        get all products only for the product owner with deleted_at null
-    """
-    
+        return ValidationResponse(success=False, message="An unexpected error occurred while deleting the product.", status_code=500)

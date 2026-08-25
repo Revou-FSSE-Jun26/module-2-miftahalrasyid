@@ -2,16 +2,17 @@ from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 import marshmallow as ma
 from app.models import Product
 from app.extensions import db
+from app.utils.sanitizer import SanitizeMixin
 
 
-class ProductSchema(SQLAlchemyAutoSchema):
+class ProductSchema(SanitizeMixin, SQLAlchemyAutoSchema):
     class Meta:
         model                 = Product
         load_instance         = True        # Convert input directly into a Product Model object
         sqla_session          = db.session
         include_fk            = True        # Include foreign keys like user_id
         include_relationships = False       # Don't auto-include relationships
-        exclude               = ('seller', 'categories')  # Exclude relationship fields from schema
+        exclude               = ('seller', 'categories', 'uuid')  # Exclude from API input/output
 
     # --- Required fields ---
     name        = ma.fields.Str(
@@ -88,14 +89,14 @@ class ProductSchema(SQLAlchemyAutoSchema):
         data.pop('category_ids', [])
         return data
     
-class ProductUpdateSchema(SQLAlchemyAutoSchema):
+class ProductUpdateSchema(SanitizeMixin, SQLAlchemyAutoSchema):
     class Meta:
         model                 = Product
         load_instance         = False       # Return dict, not model instance
         sqla_session          = db.session
         include_fk            = True
         include_relationships = False
-        exclude               = ('seller', 'categories')
+        exclude               = ('seller', 'categories', 'uuid')
 
     # --- All fields optional for partial update ---
     name        = ma.fields.Str(required=False, validate=ma.validate.Length(min=1))
@@ -113,7 +114,7 @@ class ProductUpdateSchema(SQLAlchemyAutoSchema):
 
     # --- Never accept from client ---
     id         = ma.fields.Int(dump_only=True)
-    user_id    = ma.fields.Int(dump_only=True)
+    user_id    = ma.fields.Int(required=False)
     created_at = ma.fields.DateTime(dump_only=True)
     deleted_at = ma.fields.DateTime(dump_only=True)
 
