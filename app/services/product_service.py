@@ -1,11 +1,31 @@
 from app.extensions import db
 import logging
+import os
+import re
 from flask import request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
 from app.models import Product,UserRole
 from app.models.category_model import Category
 from . import ValidationResponse
+
+
+def generate_slug(name):
+    """
+    Generate a unique slug from product name.
+    Converts to lowercase, replaces spaces/special chars with hyphens,
+    appends a number suffix if the slug already exists.
+    """
+    # Lowercase, replace non-alphanumeric with hyphens, collapse multiple hyphens
+    base_slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+    base_slug = re.sub(r'-+', '-', base_slug)
+
+    slug = base_slug
+    counter = 1
+    while Product.query.filter_by(slug=slug).first() is not None:
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+    return slug
 
     
 def get_all_products():
@@ -81,6 +101,10 @@ def create_new_product(jwt_user_id, product_instance,client_roles):
     else:
         product_instance.categories = []
     try:
+        # Auto-generate slug from product name if not already set
+        if not product_instance.slug:
+            product_instance.slug = generate_slug(product_instance.name)
+
         # product_instance already has all fields set by the route handler
         # Just save it to the database
         db.session.add(product_instance)
@@ -149,6 +173,10 @@ def update_product(product_id, update_data, jwt_user_id, roles):
         for key, value in update_data.items():
             if key in allowed and hasattr(product, key):
                 setattr(product, key, value)
+
+        # Regenerate slug if name was updated
+        if "name" in update_data and "name" in allowed:
+            product.slug = generate_slug(product.name)
 
         db.session.commit()
         logging.info(f"Product updated successfully: {product.id}")
@@ -219,6 +247,13 @@ def delete_product(product_id, jwt_user_id, roles, action="soft"):
         if action == "hard":
             if delete_policy != "hard":
                 return ValidationResponse(success=False, message="Only superadmin can perform hard delete", status_code=403)
+            # Clean up uploaded images from filesystem
+            import shutil
+            uploads_root = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'uploads')
+            product_folder = os.path.join(uploads_root, 'products', product.uuid)
+            if os.path.isdir(product_folder):
+                shutil.rmtree(product_folder)
+                logging.info(f"Deleted image folder for product {product_id}: {product_folder}")
             db.session.delete(product)
             db.session.commit()
             logging.info(f"Product hard-deleted: {product_id}")
@@ -227,6 +262,14 @@ def delete_product(product_id, jwt_user_id, roles, action="soft"):
         # Soft delete (default)
         if product.deleted_at is not None:
             return ValidationResponse(success=False, message="Product is already deleted", status_code=400)
+        # Remove images from filesystem and nullify in DB
+        import shutil
+        uploads_root = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'uploads')
+        product_folder = os.path.join(uploads_root, 'products', product.uuid)
+        if os.path.isdir(product_folder):
+            shutil.rmtree(product_folder)
+            logging.info(f"Deleted image folder for product {product_id}: {product_folder}")
+        product.images = None
         product.deleted_at = func.now()
         db.session.commit()
         logging.info(f"Product soft-deleted: {product_id}")

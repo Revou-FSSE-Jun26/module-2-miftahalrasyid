@@ -121,7 +121,19 @@ def _upload_product_image(product_id, file, jwt_user_id, bypass_ownership):
         else:
             product.images = product.images + [relative_path]
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            # Remove the file since DB update failed — prevent orphan
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            # Remove folder if empty
+            if os.path.isdir(folder_path) and not os.listdir(folder_path):
+                os.rmdir(folder_path)
+            logging.error(f"DB commit failed for image upload, cleaned file: {str(e)}")
+            return None
+
         logging.info(f"Image uploaded for product {product_id}: {relative_path}")
 
         return {
@@ -196,14 +208,23 @@ def _delete_product_image(product_id, filename, jwt_user_id, bypass_ownership):
         if relative_path not in current_images:
             return ValidationResponse(success=False, message="Image not found for this product")
 
-        # Remove from filesystem
+        # Remove from DB array first, then filesystem
+        product.images = [img for img in current_images if img != relative_path]
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"DB commit failed for image delete: {str(e)}")
+            return None
+
+        # Only remove file after DB commit succeeds
         file_path = os.path.join(UPLOAD_ROOT, relative_path)
         if os.path.exists(file_path):
             os.remove(file_path)
-
-        # Remove from DB array
-        product.images = [img for img in current_images if img != relative_path]
-        db.session.commit()
+            # Remove folder if empty
+            folder_path = os.path.dirname(file_path)
+            if os.path.isdir(folder_path) and not os.listdir(folder_path):
+                os.rmdir(folder_path)
 
         logging.info(f"Image deleted for product {product_id}: {relative_path}")
         return {"success": True, "message": "Image deleted successfully"}
