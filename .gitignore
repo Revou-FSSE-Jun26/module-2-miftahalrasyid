@@ -27,3 +27,10 @@ uploads
 # AWS CLI or SAM local caches
 .aws/
 .serverless/
+
+# === Python Testing and Coverage ===
+.coverage
+htmlcov/
+coverage.xml
+.pytest_cache/
+.cov/
