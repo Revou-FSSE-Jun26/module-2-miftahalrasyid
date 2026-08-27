@@ -9,14 +9,118 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 
 ## Features
 
-- Users can register on RevoShop.
-- Users receive an email confirmation after registering.
-- Users can log in using their registered email and password.
-- Users can have buyer and seller features.
-- Users can Create, Update, and Delete a `products`
-- Users can Create, Update, and Delete a `categories`
-- Users can group their `products` into `categories`
-- Users can place an order through junction table of `order_items` 
+### Authentication & Authorization
+- JWT-based authentication with access tokens
+- Role-based access control (RBAC) with 4 roles: BUYER, SELLER, ADMIN, SUPERADMIN
+- Field-level permission filtering per role per operation
+- OAuth (Google) login support
+- Email verification required before login
+- Gmail alias normalization (dots/plus-addressing) to prevent duplicate accounts
+- OAuth users blocked from setting/updating password
+- Soft-deleted users cannot login
+
+### Roles & Permissions
+
+#### BUYER
+- Default role assigned on registration
+- Can browse products (read-only, limited fields)
+- Can browse categories (read-only)
+- Can create orders with status `PENDING` (cart/checkout — stock NOT deducted yet, address can be null)
+- Can proceed to payment via `/api/v1/payment` which validates address and transitions order to `PAID`
+- Can soft-delete (cancel) own orders only when status is `COMPLETED` or `CANCELED`
+- Cannot delete orders with `PAID` or `PENDING` status
+- Cannot transition order status back to `PENDING`
+- Can read own orders only
+- Can update own profile (email, password, age)
+- Cannot create/update/delete products
+- Cannot manage categories
+- Cannot manage other users
+
+#### SELLER
+- Opt-in via `/api/v1/users/become-seller` (blocked if already seller or account deactivated)
+- Can create products (own only, auto-assigned to their user_id)
+- Can update own products (name, stock, brand, description, price, sku, categories)
+- Can soft-delete own products when status IS NOT `PAID` in orders
+- Can read orders that contain their products
+- Can update order status (only for orders containing their products)
+- Cannot transition order status back to `PENDING`
+- Can upload/delete product images (own products only)
+- Cannot order their own products (self-purchase prevention)
+- Cannot be soft-deleted when they have active orders with `PAID` status
+- Can only read categories and assign them to their products
+- Cannot create, update, or delete categories
+- Cannot delete users
+- Cannot hard-delete anything
+
+#### ADMIN
+- Can create, read, update, and soft-delete categories
+- When deleting categories, associated `category_items` junction records are also deleted (no orphan relations)
+- Can create, read, update, and soft-delete products (including on behalf of other users)
+- Can create, read, update, and soft-delete orders
+- Can create, read, update, and soft-delete users (including role and is_active management)
+- Can delete uploaded images with bypass ownership
+- Cannot hard-delete any resource
+- Cannot create uploads
+
+#### SUPERADMIN
+- Full CRUD on all resources: `users`, `products`, `orders`, `address`, `profile` and junction tables `order_items`, `category_items`
+- Can hard-delete any resource (permanent removal from database)
+- Can create products/orders on behalf of other users
+- Can bypass upload ownership checks
+- Can manage roles and is_active flag on all users
+
+### Orders & Cart
+- Orders created with `PENDING` status (acts as cart — stock not deducted, address can be null)
+- Payment endpoint (`/api/v1/payment`) processes the order:
+  - Validates address: if no default address is set and none specified, returns `"default address is not set"`
+  - On success: transitions status to `PAID`, deducts product stock, sets delivery address
+- Order status transitions enforced: `PAID → COMPLETED` or `PAID → CANCELED` only
+- Seller and Buyer cannot transition order status back to `PENDING`
+- On cancellation (PAID → CANCELED): stock automatically restored
+- Buyer can only soft-delete orders with `COMPLETED` or `CANCELED` status
+- Duplicate products within same order prevented
+- Subtotal, discount, tax, and total calculated automatically
+
+### Products
+- CRUD with ownership enforcement (only owner or admin+ can update/delete)
+- Cannot be deleted (soft or hard) when linked to active orders with `PAID` status (returns 409)
+- Auto-generated slug from product name
+- Stock tracked with DB-level `CHECK (stock >= 0)` constraint
+- Category assignment via many-to-many relationship through `category_items` junction table
+- Product image upload support
+
+### Categories
+- Only ADMIN and SUPERADMIN can create/update/delete categories
+- Seller and Buyer have read-only access
+- When deleting a category, associated `category_items` junction records are also deleted (no orphan relations)
+
+### Users & Profiles
+- Seller cannot be soft-deleted when they have active orders with `PAID` status
+- Seller cannot order their own products
+- Become Seller flow with guard checks (already seller, deactivated account)
+- Profile and address management
+- Default address used for payment processing
+
+### Stock Management
+- Stock deducted only upon successful payment (not on order creation)
+- Stock restored on order cancellation or deletion of PAID orders
+- DB-level constraint prevents negative stock
+
+### Uploads
+- Product image upload with ownership enforcement
+- Admin/Superadmin bypass ownership for image management
+- Seller can only manage images for own products
+- Buyer cannot upload
+
+### Platform-Wide
+- Role-based access control (RBAC) with field-level permission filtering
+- XSS protection via nh3 HTML sanitization on all inputs
+- Gmail alias normalization prevents duplicate accounts
+- Password hashing with Werkzeug PBKDF2-SHA256
+- Pagination on all list endpoints (default 10, max 30 per page)
+- Unified soft/hard delete strategy with proper HTTP status codes (200, 400, 403, 404, 409, 500)
+- IntegrityError handling on hard delete (FK constraint violations)
+- Phone validation in +62 international format
 
 
 ## Tech Stack
@@ -44,79 +148,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 
 ## ERD
 
-```mermaid
-erDiagram
-    categories {
-        int id PK
-        string name
-        datetime created_at
-        datetime deleted_at
-    }
-
-    category_items {
-        int category_id PK,FK
-        int product_id PK,FK
-        datetime created_at
-    }
-
-    products {
-        int id PK
-        string name
-        int stock
-        string brand
-        datetime created_at
-        string description
-        decimal price
-        int user_id FK
-        boolean is_active
-        string sku
-        datetime deleted_at
-    }
-
-    order_items {
-        int id PK
-        int order_id FK
-        int product_id FK
-        datetime created_at
-        int quantity
-        decimal compound_price
-        datetime deleted_at
-    }
-
-    orders {
-        int id PK
-        int user_id FK
-        string name
-        string status
-        datetime created_at
-        decimal total
-        datetime deleted_at
-    }
-
-    users {
-        int id PK
-        string email
-        int age
-        boolean is_active
-        string provider
-        string provider_key
-        datetime created_at
-        string username
-        datetime deleted_at
-        array roles
-    }
-
-    alembic_version {
-        string version_num PK
-    }
-
-    categories ||--o{ category_items : "has"
-    products ||--o{ category_items : "belongs to"
-    products ||--o{ order_items : "included in"
-    orders ||--o{ order_items : "contains"
-    users ||--o{ products : "creates"
-    users ||--o{ orders : "places"
-```
+![ERD Diagram](docs/screenshots/ERD.png)
 
 ## 🔁 Route Handling flow (Flask-Smorest + SQLAlchemy)
 
@@ -211,32 +243,119 @@ FLASK_DEBUG=1
 run migrations and *seeding*:
 ```bash
 flask db upgrade
-python app/seeds/initial_seed.py
+PYTHONPATH=. python seeds/initial_seed.py
 ```
+
+## Testing
+Tests use a separate PostgreSQL database (auto-created as `{your_db_name}_test`). Your production data is never touched.
+
+### Unit & Integration Tests
+```bash
+# Run all tests with coverage
+pytest tests/ --cov=app --cov-report=term-missing
+
+# Run a specific test file
+pytest tests/routes/v1/test_category_routes.py -v
+```
+
+Prerequisites: PostgreSQL running + `.env` configured. The test database is auto-created on first run.
+
+### Load Testing (Locust)
+```bash
+# Start the dev server first
+flask run --debug --port=8000
+
+# Run Locust (opens web UI at http://localhost:8089)
+locust -f locustfile.py --host=http://localhost:8000
+```
+
+Open `http://localhost:8089` in your browser, set the number of users and spawn rate, then start the test.
+
+![Locust Load Test Results](docs/screenshots/locust-results.png)
 
 ## Usage
 Start the development server:
 ```bash
-flask run --port=8000
+flask run --debug --port=8000
 ```
 The API will be available at `http://localhost:8000`.
 
-Example request — Show welcome to Rovodev api:
+### Example Requests
+
+**Get all products:**
 ```bash
-curl -X POST http://localhost:8000/api \
+curl http://localhost:8000/api/v1/products/
+```
+
+**Get a single product:**
+```bash
+curl http://localhost:8000/api/v1/products/1
+```
+
+**Login (get token):**
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "justin@gmail.com", "password": "Password1234"}'
+```
+
+**Create a product (requires seller/admin token):**
+```bash
+curl -X POST http://localhost:8000/api/v1/products/ \
   -H "Authorization: Bearer <your-token>" \
   -H "Content-Type: application/json" \
-  -d '{"title": "Write unit tests", "priority": "high"}'
+  -d '{"name": "wireless_mouse", "brand": "Logitech", "description": "Ergonomic wireless mouse", "price": 499000, "stock": 50, "category_ids": [1]}'
+```
+
+**Update a product:**
+```bash
+curl -X PUT http://localhost:8000/api/v1/products/1 \
+  -H "Authorization: Bearer <your-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"price": 19999000, "stock": 30}'
+```
+
+**Delete a product (soft delete):**
+```bash
+curl -X DELETE http://localhost:8000/api/v1/products/1 \
+  -H "Authorization: Bearer <your-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "soft"}'
 ```
 
 Access Swagger UI documentation on **[http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)**.
 
+## Business Logic
+
+- **Auto Slug Generation** — Product slugs are auto-generated from the product name on creation. Duplicates get a numeric suffix (`-1`, `-2`, etc.). Slug regenerates when name is updated.
+- **Deletion Guard** — Products linked to active (PAID) orders cannot be deleted. The API returns a 409 with a clear message.
+- **Image Lifecycle** — On soft or hard delete of a product, all associated image files are removed from disk and the `images` column is nullified. Upload failures roll back the file if the DB commit fails — no orphaned files.
+- **Order Pricing** — Orders auto-calculate subtotal, tax (11%), and total from product prices and quantities. Stock is deducted on order creation and restored on cancellation.
+- **Stock Validation** — Orders fail if requested quantity exceeds available stock.
+- **Email Normalization** — Gmail dots and aliases are normalized to prevent duplicate accounts (e.g., `j.doe@gmail.com` → `jdoe@gmail.com`).
+- **Soft/Hard Delete Strategy** — All resources support soft delete (sets `deleted_at`). Superadmin can hard delete permanently via `{"action": "hard"}`.
+
 ## Seeding Objective
 
-create superadmin. **update password after**
-create 1 row in every table
+Populate the database with realistic data for development and testing:
+- 32 users (1 superadmin, 1 admin, 5 sellers, 23 buyers, 2 inactive)
+- 32 profiles with bios
+- 31 addresses across Indonesia
+- 10 categories
+- 32 products with real brand names and IDR pricing
+- 39 category-product mappings
+- 32 orders with various statuses
+- 35 order items
 
-### Adding initial admin user
+All seeded users use password: `Password1234`
+
+### Key Accounts
+| Role | Email |
+|------|-------|
+| Superadmin | funnyclown1112@gmail.com |
+| Admin | mike@gmail.com |
+| Seller | justin@gmail.com, arini@gmail.com |
+| Buyer | budi@gmail.com, siti.nurhaliza@gmail.com |
 
 ## Step-by-Step Guide: Implementing HTML Request Features in Isolation 
 >Creating new feature (endpoint: GET,POST) steps using (Flask-Smorest x marsmallow x flask-sqlalchemy x marsmallow-sqlalchemy) route stack
@@ -279,13 +398,18 @@ flowchart TD
 ├── app/
 │   ├── __init__.py
 │   ├── extensions.py
+│   ├── middleware/
+│   │   ├── __init__.py
+│   │   └── auth.py
 │   ├── models/
 │   │   ├── __init__.py
+│   │   ├── address_model.py
 │   │   ├── category_items_model.py
 │   │   ├── category_model.py
 │   │   ├── order_items_model.py
 │   │   ├── order_model.py
 │   │   ├── product_model.py
+│   │   ├── profile_model.py
 │   │   └── user_model.py
 │   ├── permissions/
 │   │   ├── __init__.py
@@ -294,44 +418,70 @@ flowchart TD
 │   │   ├── __init__.py
 │   │   └── v1/
 │   │       ├── __init__.py
+│   │       ├── admin_routes_v1.py
 │   │       ├── auth_routes_v1.py
 │   │       ├── category_routes_v1.py
 │   │       ├── orders_routes_v1.py
+│   │       ├── payment_routes_v1.py
 │   │       ├── product_routes_v1.py
+│   │       ├── upload_routes_v1.py
 │   │       └── users_routes_v1.py
 │   ├── schemas/
 │   │   ├── __init__.py
+│   │   ├── address_schema.py
 │   │   ├── auth_schema.py
 │   │   ├── category_schema.py
 │   │   ├── order_item_schema.py
 │   │   ├── order_schema.py
+│   │   ├── payment_schema.py
 │   │   ├── product_schema.py
+│   │   ├── profile_schema.py
 │   │   └── user_schema.py
-│   └── services/
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── address_service.py
+│   │   ├── auth_service.py
+│   │   ├── category_service.py
+│   │   ├── order_service.py
+│   │   ├── payment_service.py
+│   │   ├── product_service.py
+│   │   ├── profile_service.py
+│   │   ├── upload_service.py
+│   │   └── user_service.py
+│   └── utils/
 │       ├── __init__.py
-│       ├── auth_service.py
-│       ├── category_service.py
-│       ├── order_service.py
-│       ├── product_service.py
-│       └── user_service.py
+│       ├── pagination.py
+│       └── sanitizer.py
 ├── docs/
 │   ├── queries.sql
 │   ├── requirements.md
 │   ├── schema.sql
+│   ├── screenshots/
+│   │   ├── ERD.png
+│   │   ├── locust-results.png
+│   │   ├── postman-delete.png
+│   │   ├── postman-get.png
+│   │   ├── postman-post.png
+│   │   └── postman-put.png
 │   └── seed.sql
+├── locustfile.py
 ├── migrations/
 │   ├── README
 │   ├── alembic.ini
 │   ├── env.py
 │   ├── script.py.mako
 │   └── versions/
+│       ├── 0268dfcb6edb_add_profiles_and_addresses_tables_.py
+│       ├── 06c257caa915_add_uuid_column_to_products.py
 │       ├── 1a42d12c6f44_rename_products_quantity_column_to_.py
+│       ├── 29d20ad1e7a2_add_slug_images_updated_at_to_products.py
 │       ├── 37490e1a0463_add_username_and_role_enum_to_users.py
 │       ├── 3ce39395ca90_alter_orders_layout_and_data_types.py
 │       ├── 503a9a24193e_add_deleted_at_and_change_all_to_server_.py
 │       ├── 7633e2e310ef_convert_order_items_from_junction_table_.py
 │       ├── 815a83d2ddfb_add_deleted_at_to_orders.py
 │       ├── 9a575b777f47_change_provider_column_from_string_to_.py
+│       ├── 9f84e4623f17_add_pricing_fields_to_orders.py
 │       ├── bf1bb0ac101e_add_is_active_and_sku_to_products.py
 │       ├── c00af829578d_fix_junction_mapping_to_string.py
 │       ├── c7f2cbb27adc_change_role_to_roles_user_table.py
@@ -341,227 +491,70 @@ flowchart TD
 │       └── fb1b2de14c14_add_deleted_at_on_user.py
 ├── requirements.txt
 ├── run.py
-└── seeds/
-    └── initial_seed.py
+├── seeds/
+│   └── initial_seed.py
+├── test_upload.py
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py
+│   ├── middleware/
+│   │   ├── __init__.py
+│   │   └── test_auth.py
+│   ├── permissions/
+│   │   ├── __init__.py
+│   │   └── test_field_filter.py
+│   ├── routes/
+│   │   ├── __init__.py
+│   │   └── v1/
+│   │       ├── __init__.py
+│   │       ├── test_admin_routes.py
+│   │       ├── test_auth_routes.py
+│   │       ├── test_category_routes.py
+│   │       ├── test_order_routes.py
+│   │       ├── test_product_routes.py
+│   │       ├── test_upload_routes.py
+│   │       └── test_user_routes.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── test_address_service.py
+│   │   ├── test_address_service_integration.py
+│   │   ├── test_auth_service.py
+│   │   ├── test_category_service.py
+│   │   ├── test_order_service.py
+│   │   ├── test_payment_service.py
+│   │   ├── test_product_service.py
+│   │   ├── test_profile_service.py
+│   │   ├── test_upload_service.py
+│   │   └── test_user_service.py
+│   └── utils/
+│       ├── __init__.py
+│       ├── test_pagination.py
+│       └── test_sanitizer.py
+├── unit_test_and_integration.md
+└── uploads/
+    └── products/
 ```
 
 
 ## API Reference
 
-### 🧑 User Module
+Full interactive documentation available at **[http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)** when running locally.
 
-#### 1. _Get All Users_
+### Postman Examples
 
-| Method | Path | Description | Authentication |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/users` | Get list of all users | None |
- 
-##### Response
-> **Body**
-> ```json
-> {
->     "data": [
->         {
->             "age": 27,
->             "created_at": "2026-08-01T20:11:02.118738+07:00",
->             "email": "budi@gmail.com",
->             "id": 1,
->             "is_active": false,
->             "provider": "password_hash",
->             "provider_key": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
->             "role": ["BUYER"],
->             "username": "budi"
->         },
->         {
->             "age": 27,
->             "created_at": "2026-08-01T20:11:02.118738+07:00",
->             "email": "husni@gmail.com",
->             "id": 3,
->             "is_active": false,
->             "provider": "password_hash",
->             "provider_key": "e10adc3949ba59abbe56e057f20f883e28b4b4dbd33b58c4886d22698e7341ea",
->             "role": ["BUYER"],
->             "username": "husni"
->         },
->         {
->
->             "age": 18,
->             "created_at": "2026-08-12T01:02:44.353652+07:00",
->             "email": "mike@gmail.com",
->             "id": 10,
->             "is_active": false,
->             "provider": "password_hash",
->             "provider_key": "1fb0ab1378099448c8800dd96f25409ec10e9ea802c0bcadbf8d322b3e9f94ec",
->             "role": ["BUYER"],
->             "username": "mike"
->         }
->     ],
->     "message": "Users retrieved successfully.",
->     "success": true
-> }
-> ```
+#### GET
+![GET Request](docs/screenshots/postman-get.png)
 
----
+#### POST
+![POST Request](docs/screenshots/postman-post.png)
 
-#### 2. _Get User Detail By ID_
+#### PUT
+![PUT Request](docs/screenshots/postman-put.png)
 
-| Method | Path | Description | Authentication |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/users/<int:id>` | Get user detail by ID | None |
+#### DELETE
+![DELETE Request](docs/screenshots/postman-delete.png)
 
-##### Success Response 
->**Body**
->```json
->{
->    "data": {
->        "age": 27,
->        "created_at": "2026-08-01T20:11:02.118738+07:00",
->        "email": "budi@gmail.com",
->        "id": 1,
->        "is_active": false,
->        "provider": "password_hash",
->        "provider_key": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
->        "role": [
->            "BUYER"
->        ],
->        "username": "budi"
->    },
->    "message": "User with id=1 is found",
->    "success": true
->}
->```
-##### Error Response 
->**Body**
->```json
->{
->    "error": "Not Found",
->    "message": "User is not found",
->    "status_code": 404,
->    "success": false
->}
->```
-
----
-
-#### 3. _Create New User_
-
-| Method | Path | Description | Authentication |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/users` | Create new user | None |
-
-##### Request 
-> [!note]
-> _This endpoint expects a multipart form._
->
-> **Parameters**
-> * `email` ( _string_ ) — __Required__
-> * `age` ( _string_ ) — __Required__
-> * `password` ( _string_ ) — __Required__
-> 
->  **Fetch Example**
->  ```javascript
->  const formdata = new FormData();
->  formdata.append("email", "adriana@gmail.com");
->  formdata.append("age", "35");
->  formdata.append("password", "adriana948");
->  
->  const requestOptions = {
->    method: "GET",
->    body: formdata,
->    redirect: "follow"
->  };
->  
->  fetch("http://127.0.0.1:8000/api/v1/users", requestOptions)
->    .then((response) => response.text())
->    .then((result) => console.log(result))
->    .catch((error) => console.error(error));
->  ```
-
-#### Success Response
->**Body**
->```json
->{
->    "data": {
->        "age": 35,
->        "created_at": "2026-08-12T16:33:27.012421+07:00",
->        "email": "adriana@gmail.com",
->        "id": 12,
->        "is_active": false,
->        "provider": "password_hash",
->        "provider_key": "f96354dd9b0cb206ba156f52be94e4cdfebad293e834fd8276643942d9e6b83f",
->        "role": [
->            "BUYER"
->        ],
->        "username": "adriana"
->    },
->    "message": " New user has been created.",
->    "success": true
->}
->```
-#### Error Response
->**Body**
->
->_Age is not a number_
->```json
->{
->    "message": "'age' must be a valid number",
->    "success": false
->}
->```
->_Required parameters are not statisfied_
->```json
->{
->    "message": "'email','age',or 'password' is not provided",
->    "success": false
->}
->```
->_Wrong email format_
->```json
->{
->    "message": "Email format is wrong",
->    "success": false
->}
->```
-
-<!-- | Method | Path | Description | Authentication |Authentication |
-| :--- | :--- | :--- | :---: | :---: |
-| <kbd>POST</kbd> | `/api/v1/auth/login` | Authenticate user & get token | None | <pre>code</pre> |
-| <kbd>GET</kbd> | `/api/v1/users` | Get list of all users | None |
-| <kbd>GET</kbd> | `/api/v1/users/<int:id>` | Get list of all users | None |
-| <kbd>POST</kbd> | `/api/v1/users` | Register a new user | None | -->
-
-### 📦 Product Module
-
-| Method | Path | Description | Authentication |
-| :--- | :--- | :--- | :---: |
-| <kbd>POST</kbd> | `/api/v1/products` | Create a new product | `Bearer Token` |
-| <kbd>GET</kbd> | `/api/v1/products` | List all products | None |
-| <kbd>GET</kbd> | `/api/v1/products/<int:id>` | Get product details by ID | None |
-| <kbd>PUT</kbd> | `/api/v1/products/<int:id>` | Update product details | `Bearer Token` |
-| <kbd>DELETE</kbd> | `/api/v1/products/<int:id>` | Remove a product | `Bearer Token` |
-
-### 📦 Category Module
-
-| Method | Path | Description | Authentication |
-| :--- | :--- | :--- | :---: |
-| <kbd>POST</kbd> | `/api/v1/categories` | Create a new category | `Bearer Token` |
-| <kbd>GET</kbd> | `/api/v1/categories` | List all category | None |
-| <kbd>GET</kbd> | `/api/v1/categories/<int:id>` | Get a specific category along with its products| None |
-| <kbd>PUT</kbd> | `/api/v1/categories/<int:id>` | Update category  | `Bearer Token` |
-| <kbd>DELETE</kbd> | `/api/v1/categories/<int:id>` | Remove a category | `Bearer Token` |
-
-### 📦 Order Module
-
-| Method | Path | Description | Authentication |
-| :--- | :--- | :--- | :---: |
-| <kbd>POST</kbd> | `/api/v1/orders` | Place a new order linked to the logged-in user | `Bearer Token` |
-| <kbd>GET</kbd> | `/api/v1/orders` | List all orders for the current user | `Bearer Token` |
-| <kbd>GET</kbd> | `/api/v1/orders/<int:id>` | View a specific order with its order items and product details | `Bearer Token` |
-| <kbd>PUT</kbd> | `/api/v1/orders/<int:id>` | Update category  | `Bearer Token` |
-| <kbd>DELETE</kbd> | `/api/v1/orders/<int:id>` | Delete an order | `Bearer Token` |
-
-
-> **Note:** All protected endpoints require a Bearer token in the `Authorization` header. Obtain a token via `POST /auth/login`.
+> All protected endpoints require a Bearer token in the `Authorization` header. Obtain a token via `POST /api/v1/auth/login` or `POST /api/v1/auth/register`.
 
 ## Contributing
 Read [CONTRIBUTING.md](./CONTRIBUTING.md) for our pull request process, coding standards, and commit message format.

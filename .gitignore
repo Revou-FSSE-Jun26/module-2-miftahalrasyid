@@ -21,7 +21,7 @@ Thumbs.db
 .kiro
 
 # Local upload folder
-uploads
+uploads/products/*
 
 ### --- AWS / Deployment ---
 # AWS CLI or SAM local caches
