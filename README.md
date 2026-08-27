@@ -233,10 +233,19 @@ createdb -U postgres revoshop_db
 ### 3. Setup Environment Variables (.env)
 Buat file `.env` di root direktori:
 ```env
-SQLALCHEMY_DATABASE_URI=postgresql://postgres:root@localhost:5432/revoshop_db
-SECRET_KEY=root_secret_key_anda
-FLASK_APP=run.py
-FLASK_DEBUG=1
+SQLALCHEMY_DATABASE_URI=postgresql://postgres:your_password@localhost:5432/revoshop_db
+secrets; print(secrets.token_hex(32))")
+JWT_SECRET_KEY=your-secret-key-here
+
+
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
+BASE_URL=your-localhost-url:port
+
+TAX_PERCENT=11
+CURRENCY=IDR
 ```
 
 ### 4. Database Migration, & Seeding
@@ -539,6 +548,86 @@ flowchart TD
 ## API Reference
 
 Full interactive documentation available at **[http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)** when running locally.
+
+### Auth
+
+| Method | Endpoint | Description | Auth |
+| :--- | :--- | :--- | :---: |
+| `POST` | `/api/v1/auth/register` | Register new user | - |
+| `POST` | `/api/v1/auth/login` | Login and get JWT | - |
+| `POST` | `/api/v1/auth/oauth/google` | Google OAuth login | - |
+| `GET` | `/api/v1/auth/email_confirmation` | Verify email | - |
+
+### Users
+
+| Method | Endpoint | Description | Auth |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/v1/users/` | List users | Bearer |
+| `POST` | `/api/v1/users/` | Create user | Bearer |
+| `GET` | `/api/v1/users/<id>` | Get user | Bearer |
+| `PUT` | `/api/v1/users/<id>` | Update user | Bearer |
+| `DELETE` | `/api/v1/users/<id>` | Delete user | Bearer |
+| `GET` | `/api/v1/users/me` | Get own profile | Bearer |
+| `PUT` | `/api/v1/users/me/profile` | Update own profile | Bearer |
+| `POST` | `/api/v1/users/become-seller` | Become seller | Bearer |
+| `GET` | `/api/v1/users/me/addresses` | List addresses | Bearer |
+| `POST` | `/api/v1/users/me/addresses` | Create address | Bearer |
+| `GET` | `/api/v1/users/me/addresses/<id>` | Get address | Bearer |
+| `PUT` | `/api/v1/users/me/addresses/<id>` | Update address | Bearer |
+| `DELETE` | `/api/v1/users/me/addresses/<id>` | Delete address | Bearer |
+
+### Products
+
+| Method | Endpoint | Description | Auth |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/v1/products/` | List products | - |
+| `POST` | `/api/v1/products/` | Create product | Bearer |
+| `GET` | `/api/v1/products/<id>` | Get product | - |
+| `PUT` | `/api/v1/products/<id>` | Update product | Bearer |
+| `DELETE` | `/api/v1/products/<id>` | Delete product | Bearer |
+
+### Categories
+
+| Method | Endpoint | Description | Auth |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/v1/categories/` | List categories | - |
+| `POST` | `/api/v1/categories/` | Create category | Bearer |
+| `GET` | `/api/v1/categories/<id>` | Get category | - |
+| `PUT` | `/api/v1/categories/<id>` | Update category | Bearer |
+| `DELETE` | `/api/v1/categories/<id>` | Delete category | Bearer |
+| `GET` | `/api/v1/categories/<id>/products` | Products in category | - |
+
+### Orders
+
+| Method | Endpoint | Description | Auth |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/v1/orders/` | List orders | Bearer |
+| `POST` | `/api/v1/orders/` | Create order | Bearer |
+| `GET` | `/api/v1/orders/<id>` | Get order | Bearer |
+| `PUT` | `/api/v1/orders/<id>` | Update order status | Bearer |
+| `DELETE` | `/api/v1/orders/<id>` | Delete order | Bearer |
+| `GET` | `/api/v1/orders/<id>/products` | Products in order | Bearer |
+
+### Payment
+
+| Method | Endpoint | Description | Auth |
+| :--- | :--- | :--- | :---: |
+| `POST` | `/api/v1/payment/` | Process payment for PENDING order | Bearer |
+
+### Uploads
+
+| Method | Endpoint | Description | Auth |
+| :--- | :--- | :--- | :---: |
+| `POST` | `/api/v1/uploads/` | Upload image | Bearer |
+| `DELETE` | `/api/v1/uploads/` | Delete image | Bearer |
+
+### Admin
+
+| Method | Endpoint | Description | Auth |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/v1/admin/products` | All products (inc. deleted/inactive) | Bearer |
+| `GET` | `/api/v1/admin/users/<id>/orders` | User's order history | Bearer |
+| `GET` | `/api/v1/admin/orders/<id>/products` | Products in any order | Bearer |
 
 ### Postman Examples
 
