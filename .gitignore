@@ -36,3 +36,5 @@ coverage.xml
 .cov/
 *.sqlite
 *.db
+
+unit_test_and_integration.md
