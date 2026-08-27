@@ -68,9 +68,18 @@ class ProductSchema(SanitizeMixin, SQLAlchemyAutoSchema):
     user_id    = ma.fields.Int(
         load_only    = True,
         required     = False,
-        load_default = True
+        load_default = None,
+        metadata     = {"description": "Owner user ID. Sellers: auto-assigned. Admin/Superadmin: can specify."}
     )
     
+    # Slug: auto-generated from product name in the service layer.
+    # Accepted in input but not required — popped in pre_load.
+    slug = ma.fields.Str(
+        required     = False,
+        load_default = None,
+        load_only    = True,
+    )
+
     # --- dump_only: server-generated, never in request body ---
     id         = ma.fields.Int(dump_only=True)
     created_at = ma.fields.DateTime(dump_only=True)
@@ -79,14 +88,15 @@ class ProductSchema(SanitizeMixin, SQLAlchemyAutoSchema):
     @ma.pre_load
     def pop_category_ids(self, data, **kwargs):
         """
-        Remove category_ids from the payload BEFORE Marshmallow-SQLAlchemy
-        tries to pass it into Product(). The route handler will read
-        category_ids directly from the raw request JSON instead.
+        Remove category_ids and slug from the payload BEFORE Marshmallow-SQLAlchemy
+        tries to pass them into Product(). The route handler reads category_ids
+        from raw request JSON. Slug is auto-generated in the service.
         """
         for field in ('name', 'brand', 'description', 'sku'):
             if field in data and isinstance(data[field], str):
                 data[field] = data[field].strip()
         data.pop('category_ids', [])
+        data.pop('slug', None)
         return data
     
 class ProductUpdateSchema(SanitizeMixin, SQLAlchemyAutoSchema):
@@ -114,6 +124,7 @@ class ProductUpdateSchema(SanitizeMixin, SQLAlchemyAutoSchema):
 
     # --- Never accept from client ---
     id         = ma.fields.Int(dump_only=True)
+    slug       = ma.fields.Str(required=False, load_default=None, load_only=True)
     user_id    = ma.fields.Int(required=False)
     created_at = ma.fields.DateTime(dump_only=True)
     deleted_at = ma.fields.DateTime(dump_only=True)

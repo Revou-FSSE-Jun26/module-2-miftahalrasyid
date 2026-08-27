@@ -58,12 +58,16 @@ def get_product_by_id(product_id):
 
 def validate_authorization(client_user_id,jwt_user_id,roles):
     """
-    add jwt user_id to mock api for admin and superadmin level
+    For admin/superadmin: use the client-provided user_id (create on behalf of others).
+    For seller: always use jwt_user_id (own products only).
     """
-    if not any(r in (UserRole.ADMIN.value,UserRole.SUPERADMIN.value) for r in roles):
-        return client_user_id
+    if any(r in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) for r in roles):
+        # Admin can specify user_id; fall back to jwt_user_id if not provided or invalid
+        if client_user_id and isinstance(client_user_id, int):
+            return client_user_id
+        return int(jwt_user_id)
     else:
-        return jwt_user_id
+        return int(jwt_user_id)
 
 def create_new_product(jwt_user_id, product_instance,client_roles):
     """
