@@ -34,3 +34,5 @@ htmlcov/
 coverage.xml
 .pytest_cache/
 .cov/
+.sqlite
+.db
