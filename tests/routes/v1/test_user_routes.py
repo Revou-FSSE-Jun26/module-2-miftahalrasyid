@@ -3,23 +3,23 @@ from unittest.mock import patch, MagicMock
 
 
 class TestGetUserPublic:
-    @patch('app.routes.v1.users_routes_v1.get_user_by')
-    def test_returns_username_only(self, mock_svc, client):
-        mock_user = MagicMock()
-        mock_user.id = 1
-        mock_user.username = 'testuser'
-        mock_svc.return_value = mock_user
-        resp = client.get('/api/v1/users/1')
+    @patch('app.routes.v1.users_routes_v1.get_user_detail')
+    def test_returns_user_detail(self, mock_svc, client, admin_headers):
+        mock_svc.return_value = {"id": 1, "username": "testuser", "email": "test@test.com", "profile": None, "addresses": []}
+        resp = client.get('/api/v1/users/1', headers=admin_headers)
         assert resp.status_code == 200
         data = resp.get_json()['data']
         assert 'username' in data
-        assert 'email' not in data
 
-    @patch('app.routes.v1.users_routes_v1.get_user_by')
-    def test_not_found(self, mock_svc, client):
+    @patch('app.routes.v1.users_routes_v1.get_user_detail')
+    def test_not_found(self, mock_svc, client, admin_headers):
         mock_svc.return_value = None
-        resp = client.get('/api/v1/users/999')
+        resp = client.get('/api/v1/users/999', headers=admin_headers)
         assert resp.status_code == 404
+
+    def test_buyer_forbidden(self, client, buyer_headers):
+        resp = client.get('/api/v1/users/1', headers=buyer_headers)
+        assert resp.status_code == 403
 
 
 class TestGetMe:

@@ -36,6 +36,35 @@ def get_user_by(id):
         return None
 
 
+def get_user_detail(user_id):
+    """
+    Retrieve a user by ID with their profile and addresses.
+    Used by admin to view full user details.
+    
+    Returns:
+        dict with user, profile, addresses on success. None if not found.
+    """
+    from app.services.profile_service import get_profile_by_user_id
+    from app.services.address_service import get_addresses_by_user
+
+    try:
+        user = db.session.query(User).get(user_id)
+        if not user:
+            return None
+
+        profile = get_profile_by_user_id(user_id)
+        addresses = get_addresses_by_user(user_id)
+
+        data = user.to_dict()
+        data["profile"] = profile.to_dict() if profile else None
+        data["addresses"] = [addr.to_dict() for addr in addresses] if addresses else []
+
+        return data
+    except Exception as e:
+        logging.error(f"Failed to retrieve user detail for ID {user_id}: {str(e)}")
+        return None
+
+
 def delete_user(user_id, caller_roles, action="soft"):
     """
     Delete a user by ID.

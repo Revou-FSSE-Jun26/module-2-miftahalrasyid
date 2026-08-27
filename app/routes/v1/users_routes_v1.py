@@ -10,6 +10,7 @@ from app.services.user_service import (
     get_all_users,
     add_new_users,
     get_user_by,
+    get_user_detail,
     delete_user,
     update_user_by,
     become_seller,
@@ -62,18 +63,23 @@ class UsersRoot(MethodView):
 
 @users_bp.route('/<int:id>')
 class UserDetail(MethodView):
-
+    @users_bp.doc(security=[{"BearerAuth": []}], responses={
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Admin or Superadmin required"},
+        "404": {"description": "User not found"},
+    })
     @users_bp.response(200, UserSchema)
+    @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     def get(self, id):
-        """Get public user profile by ID (username only)."""
-        user_data = get_user_by(id)
-        if not user_data:
+        """Get user by ID with profile and addresses (admin only)."""
+        data = get_user_detail(id)
+        if not data:
             abort(404, message="User not found.")
-        # Public fields only
+
         return jsonify({
             "success": True,
-            "message": "User profile",
-            "data": {"id": user_data.id, "username": user_data.username}
+            "message": "User detail",
+            "data": data
         }), 200
 
     @users_bp.doc(responses=UserErrorExamples.RESPONSES_PUT_USER, security=[{"BearerAuth": []}])
