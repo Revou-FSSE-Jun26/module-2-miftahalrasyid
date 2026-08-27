@@ -61,6 +61,27 @@ def delete_user(user_id, caller_roles, action="soft"):
         if delete_policy is None:
             return ValidationResponse(success=False, message="Your role does not have permission to delete users.", status_code=403)
 
+        # Block deletion of sellers who have active PAID orders (via their products)
+        if user.roles and UserRole.SELLER in user.roles:
+            from app.models.order_model import Order, OrderStatus
+            from app.models.order_items_model import Order_item
+            from app.models.product_model import Product
+            active_paid_orders = Order_item.query.join(
+                Product, Order_item.product_id == Product.id
+            ).join(
+                Order, Order_item.order_id == Order.id
+            ).filter(
+                Product.user_id == user_id,
+                Order.status == OrderStatus.PAID,
+                Order.deleted_at.is_(None)
+            ).count()
+            if active_paid_orders > 0:
+                return ValidationResponse(
+                    success=False,
+                    message=f"Cannot delete this seller. They have {active_paid_orders} active order(s) with PAID status. Please complete or cancel those orders first.",
+                    status_code=409
+                )
+
         # Hard delete: only if role policy allows "hard" AND action requested is "hard"
         if action == "hard":
             if delete_policy != "hard":

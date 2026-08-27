@@ -83,6 +83,7 @@ def create_app():
     from app.routes import product_bp, users_bp, order_bp, auth_bp, category_bp
     from app.routes.v1.upload_routes_v1 import upload_bp
     from app.routes.v1.admin_routes_v1 import admin_bp
+    from app.routes.v1.payment_routes_v1 import payment_bp
 
     api.register_blueprint(auth_bp)
     api.register_blueprint(users_bp)
@@ -91,6 +92,7 @@ def create_app():
     api.register_blueprint(category_bp)
     api.register_blueprint(upload_bp)
     api.register_blueprint(admin_bp)
+    api.register_blueprint(payment_bp)
     print("Flask app initialized successfully.")
 
     # --- Static file serving for uploads (public, no auth) ---

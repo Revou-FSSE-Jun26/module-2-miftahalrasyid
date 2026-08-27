@@ -24,14 +24,7 @@ def seed_database():
 
           # --- Reset all tables (order matters due to foreign keys) ---
           logging.info("Clearing existing data...")
-          Order_item.query.delete()
-          db.session.execute(category_items.delete())
-          Order.query.delete()
-          Product.query.delete()
-          Address.query.delete()
-          Profile.query.delete()
-          Category.query.delete()
-          User.query.delete()
+          db.session.execute(db.text('TRUNCATE order_items, category_items, orders, products, addresses, profiles, categories, users RESTART IDENTITY CASCADE'))
           db.session.commit()
           logging.info("All tables cleared.")
 
@@ -53,7 +46,7 @@ def seed_database():
           # =====================================================================
           users = [
                # --- Superadmin ---
-               User(id=1, email="funny.clown.1112@gmail.com", age=35, is_active=True,
+               User(id=1, email="funnyclown1112@gmail.com", age=35, is_active=True,
                     provider=AuthProvider.PASSWORD_HASH, provider_key=DEFAULT_PASSWORD_HASH,
                     username="funnyclown1112", roles=[UserRole.SUPERADMIN]),
                # --- Admin ---
@@ -295,17 +288,17 @@ def seed_database():
           # =====================================================================
           product_data = [
                     # Electronics (seller_id=3, justin)
-                    {"id": 1, "name": "iphone_15_pro_max", "brand": "Apple", "description": "Latest iPhone with A17 Pro chip, 48MP camera, titanium design", "price": 21999000, "stock": 25, "sku": "APL-IP15PM-256", "user_id": 3},
-                    {"id": 2, "name": "samsung_galaxy_s24_ultra", "brand": "Samsung", "description": "Galaxy AI powered flagship with S Pen and 200MP camera", "price": 19999000, "stock": 30, "sku": "SAM-S24U-256", "user_id": 3},
-                    {"id": 3, "name": "macbook_air_m3", "brand": "Apple", "description": "Ultra-thin laptop with M3 chip, 18-hour battery life, 13.6 inch display", "price": 18499000, "stock": 15, "sku": "APL-MBA-M3-256", "user_id": 3},
-                    {"id": 4, "name": "asus_rog_strix_g16", "brand": "Asus", "description": "Gaming laptop with RTX 4060, Intel i7-13650HX, 16GB RAM", "price": 22999000, "stock": 10, "sku": "ASUS-ROG-G16", "user_id": 3},
-                    {"id": 5, "name": "sony_wh1000xm5", "brand": "Sony", "description": "Premium wireless noise cancelling headphones with 30-hour battery", "price": 4999000, "stock": 40, "sku": "SNY-WH1000XM5", "user_id": 3},
-                    {"id": 6, "name": "ipad_air_m2", "brand": "Apple", "description": "10.9 inch tablet with M2 chip, perfect for creative work", "price": 10999000, "stock": 20, "sku": "APL-IPAD-AIR-M2", "user_id": 3},
-                    {"id": 7, "name": "lenovo_thinkpad_x1_carbon", "brand": "Lenovo", "description": "Business ultrabook with Intel i7, 14 inch 2.8K OLED display", "price": 25999000, "stock": 8, "sku": "LNV-X1C-GEN11", "user_id": 3},
+                    {"id": 1, "name": "iphone_15_pro_max", "brand": "Apple", "description": "Latest iPhone with A17 Pro chip, 48MP camera, titanium design", "price": 21999000, "stock": 20000, "sku": "APL-IP15PM-256", "user_id": 3},
+                    {"id": 2, "name": "samsung_galaxy_s24_ultra", "brand": "Samsung", "description": "Galaxy AI powered flagship with S Pen and 200MP camera", "price": 19999000, "stock": 20000, "sku": "SAM-S24U-256", "user_id": 3},
+                    {"id": 3, "name": "macbook_air_m3", "brand": "Apple", "description": "Ultra-thin laptop with M3 chip, 18-hour battery life, 13.6 inch display", "price": 18499000, "stock": 20000, "sku": "APL-MBA-M3-256", "user_id": 3},
+                    {"id": 4, "name": "asus_rog_strix_g16", "brand": "Asus", "description": "Gaming laptop with RTX 4060, Intel i7-13650HX, 16GB RAM", "price": 22999000, "stock": 20000, "sku": "ASUS-ROG-G16", "user_id": 3},
+                    {"id": 5, "name": "sony_wh1000xm5", "brand": "Sony", "description": "Premium wireless noise cancelling headphones with 30-hour battery", "price": 4999000, "stock": 20000, "sku": "SNY-WH1000XM5", "user_id": 3},
+                    {"id": 6, "name": "ipad_air_m2", "brand": "Apple", "description": "10.9 inch tablet with M2 chip, perfect for creative work", "price": 10999000, "stock": 20000, "sku": "APL-IPAD-AIR-M2", "user_id": 3},
+                    {"id": 7, "name": "lenovo_thinkpad_x1_carbon", "brand": "Lenovo", "description": "Business ultrabook with Intel i7, 14 inch 2.8K OLED display", "price": 25999000, "stock": 20000, "sku": "LNV-X1C-GEN11", "user_id": 3},
                     # Fashion (seller_id=4, arini)
-                    {"id": 8, "name": "nike_air_max_90", "brand": "Nike", "description": "Classic running shoes with visible Air cushioning and retro style", "price": 1899000, "stock": 50, "sku": "NK-AM90-WHT-42", "user_id": 4},
-                    {"id": 9, "name": "adidas_ultraboost_light", "brand": "Adidas", "description": "Lightweight running shoes with BOOST midsole technology", "price": 2499000, "stock": 35, "sku": "ADS-UBL-BLK-43", "user_id": 4},
-                    {"id": 10, "name": "uniqlo_airism_polo", "brand": "Uniqlo", "description": "Breathable polo shirt with DRY technology for everyday comfort", "price": 299000, "stock": 100, "sku": "UNQ-POLO-NVY-L", "user_id": 4},
+                    {"id": 8, "name": "nike_air_max_90", "brand": "Nike", "description": "Classic running shoes with visible Air cushioning and retro style", "price": 1899000, "stock": 20000, "sku": "NK-AM90-WHT-42", "user_id": 4},
+                    {"id": 9, "name": "adidas_ultraboost_light", "brand": "Adidas", "description": "Lightweight running shoes with BOOST midsole technology", "price": 2499000, "stock": 20000, "sku": "ADS-UBL-BLK-43", "user_id": 4},
+                    {"id": 10, "name": "uniqlo_airism_polo", "brand": "Uniqlo", "description": "Breathable polo shirt with DRY technology for everyday comfort", "price": 299000, "stock": 20000, "sku": "UNQ-POLO-NVY-L", "user_id": 4},
                     {"id": 11, "name": "levis_501_original_jeans", "brand": "Levi's", "description": "Iconic straight fit jeans with button fly, dark wash", "price": 1299000, "stock": 45, "sku": "LVS-501-DRK-32", "user_id": 4},
                     {"id": 12, "name": "zara_oversized_blazer", "brand": "Zara", "description": "Women oversized blazer in neutral tone, perfect for layering", "price": 1599000, "stock": 20, "sku": "ZRA-BLZ-BGE-M", "user_id": 4},
                     {"id": 13, "name": "converse_chuck_taylor_70", "brand": "Converse", "description": "High-top canvas sneakers with vintage styling and cushioned insole", "price": 1199000, "stock": 60, "sku": "CNV-CT70-BLK-41", "user_id": 4},
@@ -515,6 +508,17 @@ def seed_database():
           # =====================================================================
           try:
                db.session.commit()
+
+               # Reset all sequences to max(id) + 1 so new inserts don't conflict
+               db.session.execute(db.text("SELECT setval('users_id_seq', (SELECT MAX(id) FROM users))"))
+               db.session.execute(db.text("SELECT setval('profiles_id_seq', (SELECT MAX(id) FROM profiles))"))
+               db.session.execute(db.text("SELECT setval('addresses_id_seq', (SELECT MAX(id) FROM addresses))"))
+               db.session.execute(db.text("SELECT setval('categories_id_seq', (SELECT MAX(id) FROM categories))"))
+               db.session.execute(db.text("SELECT setval('products_id_seq', (SELECT MAX(id) FROM products))"))
+               db.session.execute(db.text("SELECT setval('orders_id_seq', (SELECT MAX(id) FROM orders))"))
+               db.session.execute(db.text("SELECT setval('order_items_id_seq', (SELECT MAX(id) FROM order_items))"))
+               db.session.commit()
+
                logging.info("Database seeding completed successfully!")
                logging.info("=" * 50)
                logging.info("SEED SUMMARY:")
@@ -529,7 +533,7 @@ def seed_database():
                logging.info("=" * 50)
                logging.info("Login credentials:")
                logging.info("  All users password: Password1234")
-               logging.info("  Superadmin: funny.clown.1112@gmail.com")
+               logging.info("  Superadmin: funnyclown1112@gmail.com")
                logging.info("  Admin:      mike@gmail.com")
                logging.info("  Sellers:    justin@gmail.com, arini@gmail.com, david.wijaya@gmail.com, sarah.chen@gmail.com, rizky.pratama@gmail.com")
                logging.info("  Buyers:     budi@gmail.com, siti.nurhaliza@gmail.com, etc.")

@@ -79,8 +79,8 @@ class AuthLogin(MethodView):
             "Super Admin Account": {
                 "summary": "Log in as Super Admin",
                 "value": {
-                    "email": "funny.clown.1112@gmail.com",
-                    "password": "root1234"
+                    "email": "funnyclown1112@gmail.com",
+                    "password": "Password1234"
                 }
             },
             "Regular Admin Account": {

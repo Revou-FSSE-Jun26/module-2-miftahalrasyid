@@ -106,7 +106,9 @@ def create_order(order_instance, items_data, jwt_user_id, roles):
 
     # Set user_id
     order_instance.user_id = int(jwt_user_id)
-    order_instance.status = OrderStatus.PAID
+    # Orders start as PENDING (cart). Stock is NOT deducted until payment.
+    order_instance.status = OrderStatus.PENDING
+    # address_id can be null at this stage (set during payment)
 
     try:
         # Validate items and calculate total
@@ -138,7 +140,11 @@ def create_order(order_instance, items_data, jwt_user_id, roles):
             if not product:
                 return ValidationResponse(success=False, message=f"Product with id '{product_id}' is not found or not available")
 
-            # Check stock
+            # Self-purchase prevention: seller cannot order their own products
+            if product.user_id == int(jwt_user_id):
+                return ValidationResponse(success=False, message=f"You cannot order your own product (product_id: {product_id})")
+
+            # Check stock availability (reserve check only, no deduction yet)
             if product.stock < quantity:
                 return ValidationResponse(success=False, message=f"Insufficient stock for product '{product.name}'. Available: {product.stock}")
 
@@ -173,7 +179,7 @@ def create_order(order_instance, items_data, jwt_user_id, roles):
         db.session.add(order_instance)
         db.session.flush()
 
-        # Create order items and deduct stock
+        # Create order items (NO stock deduction — deducted on payment)
         for item_data in order_items:
             order_item = Order_item(
                 order_id=order_instance.id,
@@ -182,9 +188,6 @@ def create_order(order_instance, items_data, jwt_user_id, roles):
                 compound_price=item_data["compound_price"]
             )
             db.session.add(order_item)
-
-            # Deduct stock
-            item_data["product"].stock -= item_data["quantity"]
 
         db.session.commit()
         logging.info(f"Order created successfully: {order_instance.id}")
@@ -264,7 +267,7 @@ def update_order(order_id, update_data, jwt_user_id, roles):
             if not valid:
                 return ValidationResponse(
                     success=False,
-                    message=f"Invalid status transition from {order.status.value} to {new_status_enum.value}. Allowed: PAID → COMPLETED or PAID → CANCELED"
+                    message=f"Invalid status transition from {order.status.value} to {new_status_enum.value}. Allowed: PENDING → PAID, PAID → COMPLETED or PAID → CANCELED"
                 )
 
             # If transitioning to CANCELED, restore stock
@@ -322,11 +325,11 @@ def delete_order(order_id, jwt_user_id, roles, action="soft"):
         is_admin = any(r in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) for r in roles)
 
         if not is_admin:
-            # Buyer can only cancel own PAID orders
+            # Buyer can only delete own orders with COMPLETED or CANCELED status
             if order.user_id != int(jwt_user_id):
                 return ValidationResponse(success=False, message="Unauthorized to delete this order", status_code=403)
-            if order.status != OrderStatus.PAID:
-                return ValidationResponse(success=False, message="Can only cancel orders with PAID status", status_code=400)
+            if order.status not in (OrderStatus.COMPLETED, OrderStatus.CANCELED):
+                return ValidationResponse(success=False, message="Can only delete orders with COMPLETED or CANCELED status", status_code=400)
 
         # Verify all products in this order still exist (not hard-deleted)
         order_items_list = Order_item.query.filter(
@@ -357,10 +360,7 @@ def delete_order(order_id, jwt_user_id, roles, action="soft"):
         if order.deleted_at is not None:
             return ValidationResponse(success=False, message="Order is already deleted", status_code=400)
 
-        # Restore stock on cancellation if order is PAID
-        if order.status == OrderStatus.PAID:
-            _restore_stock(order_id)
-
+        # No stock restoration needed for COMPLETED/CANCELED orders (already handled during status transition)
         order.deleted_at = func.now()
         db.session.commit()
         logging.info(f"Order soft-deleted: {order_id}")
@@ -383,11 +383,13 @@ def delete_order(order_id, jwt_user_id, roles, action="soft"):
 def _validate_status_transition(current_status, new_status):
     """
     Validate that a status transition follows the allowed rules:
-    PAID -> COMPLETED (seller accepts)
-    PAID -> CANCELED (seller rejects / cancels)
-    No other transitions allowed.
+    PENDING -> PAID (via payment endpoint)
+    PAID -> COMPLETED (seller fulfills)
+    PAID -> CANCELED (seller rejects / buyer cancels)
+    No transition back to PENDING is allowed.
     """
     allowed_transitions = {
+        OrderStatus.PENDING: {OrderStatus.PAID},
         OrderStatus.PAID: {OrderStatus.COMPLETED, OrderStatus.CANCELED},
     }
 

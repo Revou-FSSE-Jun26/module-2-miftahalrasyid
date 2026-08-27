@@ -72,14 +72,20 @@ class TestCreateOrder:
                 stock=10, brand='brand', description='desc', price=Decimal('100'), is_active=True)
             db_session.add(product)
             db_session.commit()
+            # Create buyer (separate from seller to avoid self-purchase block)
+            buyer = User(username='buyer1', email='buyer_test1@test.com', age=25, is_active=True,
+                provider=AuthProvider.PASSWORD_HASH, provider_key=generate_password_hash('pass'),
+                roles=[UserRole.BUYER])
+            db_session.add(buyer)
+            db_session.commit()
             # Create order instance
             order = Order(name='test order')
             from app.services.order_service import create_order
-            result = create_order(order, [{'product_id': product.id, 'quantity': 2}], str(seller.id), ['BUYER'])
+            result = create_order(order, [{'product_id': product.id, 'quantity': 2}], str(buyer.id), ['BUYER'])
             assert result is not None
-            assert result.status == OrderStatus.PAID
-            # Stock deducted
-            assert product.stock == 8
+            assert result.status == OrderStatus.PENDING
+            # Stock NOT deducted (deducted on payment)
+            assert product.stock == 10
 
     def test_create_order_insufficient_stock(self, app, db_session):
         
@@ -92,9 +98,14 @@ class TestCreateOrder:
                 stock=1, brand='brand', description='desc', price=Decimal('50'), is_active=True)
             db_session.add(product)
             db_session.commit()
+            buyer = User(username='buyer2', email='buyer_test2@test.com', age=25, is_active=True,
+                provider=AuthProvider.PASSWORD_HASH, provider_key=generate_password_hash('pass'),
+                roles=[UserRole.BUYER])
+            db_session.add(buyer)
+            db_session.commit()
             order = Order(name='fail order')
             from app.services.order_service import create_order
             from app.services import ValidationResponse
-            result = create_order(order, [{'product_id': product.id, 'quantity': 5}], str(seller.id), ['BUYER'])
+            result = create_order(order, [{'product_id': product.id, 'quantity': 5}], str(buyer.id), ['BUYER'])
             assert isinstance(result, ValidationResponse)
             assert 'Insufficient stock' in result.message
