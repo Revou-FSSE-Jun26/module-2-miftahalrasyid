@@ -43,23 +43,6 @@ def create_app():
             }
         }
     }
-    # app.config["API_SPEC_OPTIONS"] = {
-    #     "components": {
-    #         "securitySchemes": {
-    #             "bearerAuth": {
-    #                 "type": "oauth2",  # <-- Change from "http" to "oauth2"
-    #                 "description": "Enter your credentials to log in automatically",
-    #                 "flows": {
-    #                     "password": {
-    #                         # The absolute or relative URL to your login endpoint
-    #                         "tokenUrl": "/auth/login", 
-    #                         "scopes": {}
-    #                     }
-    #                 }
-    #             }
-    #         }
-    #     }
-    # }
 
     # Initialize extensions
     db.init_app(app)
@@ -104,8 +87,31 @@ def create_app():
     def serve_upload(filepath):
         return send_from_directory(upload_folder, filepath)
 
+    @app.route('/health')
+    def health():
+        """Health check for load balancers and uptime monitors."""
+        checks = {"app": "ok"}
+        status_code = 200
+        try:
+            db.session.execute(db.text('SELECT 1'))
+            checks["database"] = "ok"
+        except Exception:
+            checks["database"] = "unreachable"
+            status_code = 503
+        return jsonify({
+            "status": "healthy" if status_code == 200 else "unhealthy",
+            "checks": checks
+        }), status_code
+
     @app.route('/api')
     def home():
-        return jsonify("message", 'Welcome to Rovodev Shop api!')
+        """API root — returns metadata and useful links."""
+        return jsonify({
+            "name": app.config["API_TITLE"],
+            "version": app.config["API_VERSION"],
+            "message": "Welcome to Rovodev Shop API",
+            "docs": "/swagger-ui",
+            "health": "/health"
+        }), 200
 
     return app
