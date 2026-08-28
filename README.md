@@ -549,6 +549,8 @@ flowchart TD
 
 Full interactive documentation available at **[http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)** when running locally.
 
+Github Pages Swagger documentation available at **[https://revou-fsse-jun26.github.io/module-2-miftahalrasyid/](https://revou-fsse-jun26.github.io/module-2-miftahalrasyid/)**
+
 ### Auth
 
 | Method | Endpoint | Description | Auth |
