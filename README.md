@@ -282,6 +282,26 @@ Open `http://localhost:8089` in your browser, set the number of users and spawn 
 
 ![Locust Load Test Results](docs/screenshots/locust-results.png)
 
+### Security Audit
+`audit.sh` runs a suite of security checks. It's report-friendly locally (missing tools produce warnings, not errors) and runs automatically in CI before Swagger deployment (a failed audit blocks the deploy).
+
+```bash
+# Optional: install the scanners for full coverage
+pip install pip-audit bandit
+brew install gitleaks   # macOS
+
+# Run the audit
+./audit.sh
+```
+
+What it checks:
+- **Secrets** — scans for hardcoded credentials, API keys, tokens, and private keys (`gitleaks`, with a `grep` fallback)
+- **Dependencies** — flags known CVEs in `requirements.txt` (`pip-audit`)
+- **Static analysis** — detects insecure code patterns in `app/` (`bandit`)
+- **Env hygiene** — confirms `.env` is gitignored, untracked, and absent from git history
+
+Exit code is `0` if all critical checks pass, `1` otherwise.
+
 ## Usage
 Start the development server:
 ```bash
@@ -404,6 +424,10 @@ flowchart TD
 ```text
 ./
 ├── README.md
+├── audit.sh
+├── .github/
+│   └── workflows/
+│       └── deploy-swagger.yml
 ├── app/
 │   ├── __init__.py
 │   ├── extensions.py
@@ -630,6 +654,16 @@ Github Pages Swagger documentation available at **[https://revou-fsse-jun26.gith
 | `GET` | `/api/v1/admin/products` | All products (inc. deleted/inactive) | Bearer |
 | `GET` | `/api/v1/admin/users/<id>/orders` | User's order history | Bearer |
 | `GET` | `/api/v1/admin/orders/<id>/products` | Products in any order | Bearer |
+
+### System
+
+Infrastructure endpoints (not versioned, not in Swagger).
+
+| Method | Endpoint | Description | Auth |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api` | API root — returns name, version, and links | - |
+| `GET` | `/health` | Health check (app + database status) | - |
+| `GET` | `/uploads/<filepath>` | Serve uploaded image file | - |
 
 ### Postman Examples
 
