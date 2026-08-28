@@ -1,0 +1,22 @@
+# Gitleaks configuration for RevoShop
+# Extends the default ruleset, then allowlists known non-secrets.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist for seed/demo credentials that are not real secrets"
+
+# Demo/seed passwords used only to populate the local dev database.
+# These are intentional sample data, not production credentials.
+regexes = [
+  '''password\s*=\s*["']admin123["']''',
+  '''Password1234''',
+]
+
+# Files that legitimately contain placeholder/example values.
+paths = [
+  '''\.env\.example$''',
+  '''seeds/.*''',
+  '''README\.md$''',
+]

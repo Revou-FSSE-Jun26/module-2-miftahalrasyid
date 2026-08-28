@@ -37,7 +37,11 @@ section "1. Secret & Credential Detection"
 
 if command -v gitleaks >/dev/null 2>&1; then
     info "Running gitleaks..."
-    if gitleaks detect --source . --no-banner --redact 2>/dev/null; then
+    GITLEAKS_CONFIG_FLAG=""
+    if [ -f ".gitleaks.toml" ]; then
+        GITLEAKS_CONFIG_FLAG="--config .gitleaks.toml"
+    fi
+    if gitleaks detect --source . $GITLEAKS_CONFIG_FLAG --no-banner --redact 2>/dev/null; then
         pass "gitleaks found no secrets"
     else
         fail "gitleaks detected potential secrets (see output above)"
