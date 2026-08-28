@@ -36,13 +36,15 @@ jobs:
           JWT_SECRET_KEY: "ci-secret"
         run: |
           python -c "
+          import json
           from app import create_app
           app = create_app()
-          with app.app_context():
-              import json
-              spec = app.extensions['flask-smorest'].spec.to_dict()
-              with open('openapi.json', 'w') as f:
-                  json.dump(spec, f, indent=2)
+          client = app.test_client()
+          resp = client.get('/openapi.json')
+          assert resp.status_code == 200, f'Failed to fetch spec: {resp.status_code}'
+          with open('openapi.json', 'w') as f:
+              json.dump(resp.get_json(), f, indent=2)
+          print('OpenAPI spec generated:', len(resp.get_json().get('paths', {})), 'paths')
           "
 
       - name: Build Swagger UI static site
