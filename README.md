@@ -50,7 +50,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Can only read categories and assign them to their products
 - Cannot create, update, or delete categories
 - Cannot delete users
-- Cannot hard-delete anything
+- Cannot hard-delete anything except own uploaded images.
 
 #### ADMIN
 - Can create, read, update, and soft-delete categories
@@ -206,7 +206,12 @@ git clone https://github.com
 cd module-2-miftahalrasyid
 python -m venv venv
 source venv/bin/activate
+
+# Runtime only (production)
 pip install -r requirements.txt
+
+# Or, for development (includes testing, load testing, and security tools)
+pip install -r requirements-dev.txt
 ```
 
 ### install postgresql 
