@@ -97,6 +97,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 ### Users & Profiles
 - Seller cannot be soft-deleted when they have active orders with `PAID` status
 - Seller cannot order their own products
+- Privilege-escalation guard: only a superadmin can grant the `SUPERADMIN` role (admin attempts return 403)
 - Become Seller flow with guard checks (already seller, deactivated account)
 - Profile and address management
 - Default address used for payment processing
@@ -270,6 +271,8 @@ PYTHONPATH=. python seeds/initial_seed.py
 
 ## Testing
 Tests use a separate PostgreSQL database (auto-created as `{your_db_name}_test`). Your production data is never touched.
+
+**Current status:** 292 tests passing · 84% code coverage
 
 ### Unit & Integration Tests
 ```bash
