@@ -178,6 +178,14 @@ def update_user_by(id, user_instance, caller_roles=None):
         if "roles" in allowed:
             roles_val = getattr(user_instance, 'roles', None)
             if roles_val is not None:
+                # Privilege-escalation guard: only a SUPERADMIN can grant SUPERADMIN.
+                caller_is_superadmin = UserRole.SUPERADMIN.value in caller_roles
+                if not caller_is_superadmin and UserRole.SUPERADMIN.value in roles_val:
+                    return ValidationResponse(
+                        success=False,
+                        message="Only a superadmin can assign the SUPERADMIN role.",
+                        status_code=403
+                    )
                 # Convert string list to UserRole enum list
                 user.roles = [UserRole(r) for r in roles_val]
 

@@ -132,6 +132,46 @@ class TestUpdateUserBy:
         result = update_user_by(user.id, update_obj, ['ADMIN'])
         assert UserRole.SELLER in result.roles
 
+    def test_admin_cannot_grant_superadmin(self, app, db_session):
+        """An ADMIN must not be able to escalate a user to SUPERADMIN."""
+        user = User(username='escalate', email='escalate@test.com', age=25, is_active=True,
+            provider=AuthProvider.PASSWORD_HASH, provider_key=generate_password_hash('p'),
+            roles=[UserRole.BUYER])
+        db_session.add(user)
+        db_session.commit()
+        from app.services.user_service import update_user_by
+        from app.services import ValidationResponse
+        from unittest.mock import MagicMock
+        update_obj = MagicMock()
+        update_obj.age = None
+        update_obj.provider_key = None
+        update_obj.roles = ['BUYER', 'SUPERADMIN']
+        update_obj.is_active = None
+        result = update_user_by(user.id, update_obj, ['ADMIN'])
+        assert isinstance(result, ValidationResponse)
+        assert result.success is False
+        assert result.status_code == 403
+        # Ensure the escalation did NOT persist
+        db_session.refresh(user)
+        assert UserRole.SUPERADMIN not in user.roles
+
+    def test_superadmin_can_grant_superadmin(self, app, db_session):
+        """A SUPERADMIN is allowed to grant the SUPERADMIN role."""
+        user = User(username='promote', email='promote@test.com', age=25, is_active=True,
+            provider=AuthProvider.PASSWORD_HASH, provider_key=generate_password_hash('p'),
+            roles=[UserRole.BUYER])
+        db_session.add(user)
+        db_session.commit()
+        from app.services.user_service import update_user_by
+        from unittest.mock import MagicMock
+        update_obj = MagicMock()
+        update_obj.age = None
+        update_obj.provider_key = None
+        update_obj.roles = ['BUYER', 'SUPERADMIN']
+        update_obj.is_active = None
+        result = update_user_by(user.id, update_obj, ['SUPERADMIN'])
+        assert UserRole.SUPERADMIN in result.roles
+
 
 class TestBecomeSeller:
     def test_success(self, app, db_session):

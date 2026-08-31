@@ -58,6 +58,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Can create, read, update, and soft-delete products (including on behalf of other users)
 - Can create, read, update, and soft-delete orders
 - Can create, read, update, and soft-delete users (including role and is_active management)
+- Can manage user roles EXCEPT `SUPERADMIN` — only a superadmin can grant the `SUPERADMIN` role (privilege-escalation guard, returns 403)
 - Can delete uploaded images with bypass ownership
 - Cannot hard-delete any resource
 - Cannot create uploads
@@ -68,6 +69,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Can create products/orders on behalf of other users
 - Can bypass upload ownership checks
 - Can manage roles and is_active flag on all users
+- Is the only role that can grant the `SUPERADMIN` role to another user
 
 ### Orders & Cart
 - Orders created with `PENDING` status (acts as cart — stock not deducted, address can be null)
