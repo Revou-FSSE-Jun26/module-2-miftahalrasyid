@@ -112,6 +112,13 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Seller can only manage images for own products
 - Buyer cannot upload
 
+### Logging
+- Environment-aware logging driven by `FLASK_ENV` (`local`, `development`, `production`)
+- **local:** all logs (DEBUG and up) to the console, no file
+- **development / production:** console output plus an ERROR-only log file for efficiency
+- Daily-rotating error log (`logs/error.log`) — a new file each day, keeping up to 1 year of history (configurable via `LOG_BACKUP_DAYS`)
+- Optional overrides: `LOG_LEVEL`, `LOG_DIR`, `LOG_BACKUP_DAYS`
+
 ### Platform-Wide
 - Role-based access control (RBAC) with field-level permission filtering
 - XSS protection via nh3 HTML sanitization on all inputs
@@ -121,6 +128,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Unified soft/hard delete strategy with proper HTTP status codes (200, 400, 403, 404, 409, 500)
 - IntegrityError handling on hard delete (FK constraint violations)
 - Phone validation in +62 international format
+- Health check endpoint (`/health`) reporting app and database status
 
 
 ## Tech Stack

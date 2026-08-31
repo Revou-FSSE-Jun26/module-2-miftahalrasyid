@@ -4,11 +4,15 @@ from flask import Flask, jsonify
 from flask_smorest import Api
 from dotenv import load_dotenv
 from app.extensions import db, migrate, jwt
+from app.utils.logger import setup_logging
 
 load_dotenv()
 
 
 def create_app():
+    # Configure logging before anything else so all startup logs are captured
+    setup_logging()
+
     app = Flask(__name__)
 
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ["SQLALCHEMY_DATABASE_URI"]

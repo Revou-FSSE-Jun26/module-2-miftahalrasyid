@@ -44,3 +44,6 @@ migrations/_archive_versions/
 
 # === Japanese README (local only, not pushed) ===
 readme_japanese.md
+
+# === Runtime logs ===
+logs/
