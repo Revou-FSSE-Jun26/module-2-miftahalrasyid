@@ -38,3 +38,9 @@ coverage.xml
 *.db
 
 unit_test_and_integration.md
+
+# === Archived (squashed) migrations — kept locally as backup, not pushed ===
+migrations/_archive_versions/
+
+# === Japanese README (local only, not pushed) ===
+readme_japanese.md

@@ -580,6 +580,8 @@ Full interactive documentation available at **[http://localhost:8000/swagger-ui]
 
 Github Pages Swagger documentation available at **[https://revou-fsse-jun26.github.io/module-2-miftahalrasyid/](https://revou-fsse-jun26.github.io/module-2-miftahalrasyid/)**
 
+Full interactive documentation available at **[https://module-2-miftahalrasyid.onrender.com/swagger-ui](https://module-2-miftahalrasyid.onrender.com/swagger-ui)** when running on render.
+
 ### Auth
 
 | Method | Endpoint | Description | Auth |
