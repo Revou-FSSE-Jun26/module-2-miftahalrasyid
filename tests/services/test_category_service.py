@@ -19,6 +19,18 @@ class TestCreateCategory:
             result = create_category(cat, ['BUYER'])
             assert isinstance(result, ValidationResponse)
 
+    def test_duplicate_name(self, app, db_session):
+        """Creating a category with an existing name hits the IntegrityError branch."""
+        from app.services.category_service import create_category
+        first = Category(name='dupe_cat')
+        result1 = create_category(first, ['ADMIN'])
+        assert result1 is not None
+        # Second with same name -> unique violation
+        second = Category(name='dupe_cat')
+        result2 = create_category(second, ['ADMIN'])
+        assert isinstance(result2, ValidationResponse)
+        assert 'already exists' in result2.message
+
 
 class TestDeleteCategory:
     def test_not_found(self, app, db_session):
@@ -87,6 +99,17 @@ class TestUpdateCategory:
         result = update_category(cat.id, {'name': 'new'}, ['BUYER'])
         assert isinstance(result, ValidationResponse)
         assert 'permission' in result.message
+
+    def test_duplicate_name_on_update(self, app, db_session):
+        """Updating a category to a name that already exists hits the IntegrityError branch."""
+        from app.services.category_service import update_category
+        existing = Category(name='taken_name')
+        target = Category(name='rename_me')
+        db_session.add_all([existing, target])
+        db_session.commit()
+        result = update_category(target.id, {'name': 'taken_name'}, ['ADMIN'])
+        assert isinstance(result, ValidationResponse)
+        assert 'already exists' in result.message
 
 
 class TestDeleteCategoryExtra:

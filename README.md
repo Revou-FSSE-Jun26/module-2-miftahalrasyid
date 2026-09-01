@@ -274,7 +274,7 @@ PYTHONPATH=. python seeds/initial_seed.py
 ## Testing
 Tests use a separate PostgreSQL database (auto-created as `{your_db_name}_test`). Your production data is never touched.
 
-**Current status:** 292 tests passing · 84% code coverage
+**Current status:** 304 tests passing · 85% code coverage
 
 ### Unit & Integration Tests
 ```bash

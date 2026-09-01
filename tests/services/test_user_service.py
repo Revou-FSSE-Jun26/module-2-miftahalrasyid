@@ -88,6 +88,57 @@ class TestGetUserBy:
         assert result is None
 
 
+class TestGetUserDetail:
+    def test_with_profile_and_addresses(self, app, db_session):
+        """Returns a dict with user data, profile, and addresses."""
+        from app.models.profile_model import Profile
+        from app.models.address_model import Address
+        from app.services.user_service import get_user_detail
+
+        user = User(username='detailuser', email='detailuser@test.com', age=30, is_active=True,
+            provider=AuthProvider.PASSWORD_HASH, provider_key=generate_password_hash('p'),
+            roles=[UserRole.BUYER])
+        db_session.add(user)
+        db_session.commit()
+
+        profile = Profile(user_id=user.id, bio='hello', avatar_url=None, phone='+6281234567890')
+        db_session.add(profile)
+        address = Address(user_id=user.id, label='Home', recipient_name='Detail User',
+            phone='+6281234567890', address_line='Jl. Detail 1', city='Jakarta',
+            province='DKI Jakarta', postal_code='12345', is_default=True)
+        db_session.add(address)
+        db_session.commit()
+
+        data = get_user_detail(user.id)
+        assert data is not None
+        assert data['username'] == 'detailuser'
+        assert data['profile'] is not None
+        assert data['profile']['bio'] == 'hello'
+        assert len(data['addresses']) == 1
+        assert data['addresses'][0]['label'] == 'Home'
+
+    def test_without_profile_or_addresses(self, app, db_session):
+        """Returns user data with profile=None and empty addresses list."""
+        from app.services.user_service import get_user_detail
+
+        user = User(username='baredetail', email='baredetail@test.com', age=28, is_active=True,
+            provider=AuthProvider.PASSWORD_HASH, provider_key=generate_password_hash('p'),
+            roles=[UserRole.BUYER])
+        db_session.add(user)
+        db_session.commit()
+
+        data = get_user_detail(user.id)
+        assert data is not None
+        assert data['username'] == 'baredetail'
+        assert data['profile'] is None
+        assert data['addresses'] == []
+
+    def test_not_found(self, app, db_session):
+        """Returns None when the user does not exist."""
+        from app.services.user_service import get_user_detail
+        assert get_user_detail(99999) is None
+
+
 class TestUpdateUserBy:
     def test_updates_age(self, app, db_session):
         user = User(username='updage', email='updage@test.com', age=25, is_active=True,
