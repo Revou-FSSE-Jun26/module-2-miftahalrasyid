@@ -28,15 +28,55 @@ def generate_slug(name):
     return slug
 
     
-def get_all_products():
+def _apply_product_filters(query, filters):
     """
-    Get all active products with pagination.
-    Reads ?page and ?per_page from query params.
+    Apply search / category / price filters and sorting to a Product query.
+    `filters` is the validated query-args dict (all keys optional).
+    """
+    filters = filters or {}
+
+    search = filters.get("search")
+    if search:
+        query = query.filter(Product.name.ilike(f"%{search}%"))
+
+    category_id = filters.get("category_id")
+    if category_id:
+        query = query.filter(Product.categories.any(Category.id == category_id))
+
+    min_price = filters.get("min_price")
+    if min_price is not None:
+        query = query.filter(Product.price >= min_price)
+
+    max_price = filters.get("max_price")
+    if max_price is not None:
+        query = query.filter(Product.price <= max_price)
+
+    sort = filters.get("sort")
+    sort_columns = {"price": Product.price, "name": Product.name, "created_at": Product.created_at}
+    if sort:
+        descending = sort.startswith("-")
+        column = sort_columns.get(sort.lstrip("-"))
+        if column is not None:
+            query = query.order_by(column.desc() if descending else column.asc())
+    else:
+        query = query.order_by(Product.id.asc())
+
+    return query
+
+
+def get_all_products(filters=None):
+    """
+    Get all active products with pagination, filtering and sorting.
+
+    Args:
+        filters: validated query-args dict (page, per_page, search,
+                 category_id, min_price, max_price, sort). All optional.
     """
     from app.utils.pagination import paginate_query
     try:
         query = Product.query.filter(Product.deleted_at.is_(None)).filter_by(is_active=True)
-        return paginate_query(query)
+        query = _apply_product_filters(query, filters)
+        return paginate_query(query, args=filters)
     except Exception as e:
         logging.error(f"Failed to retrieve products: {str(e)}")
         return None
@@ -55,6 +95,32 @@ def get_product_by_id(product_id):
     except Exception as e:
         logging.error(f"Failed to retrieve product {product_id}: {str(e)}")
         return None
+
+def get_products_by_category(category_id, filters=None):
+    """
+    Get active products under a specific category with pagination/filtering/sorting.
+
+    Args:
+        category_id: category to scope to.
+        filters: validated query-args dict (page, per_page, search,
+                 min_price, max_price, sort). All optional.
+    """
+    from app.utils.pagination import paginate_query
+    try:
+        query = Product.query.filter(
+            Product.deleted_at.is_(None),
+            Product.is_active == True,
+            Product.categories.any(Category.id == category_id),
+        )
+        # category_id from filters is ignored here; the path param wins.
+        scoped_filters = dict(filters or {})
+        scoped_filters.pop("category_id", None)
+        query = _apply_product_filters(query, scoped_filters)
+        return paginate_query(query, args=filters)
+    except Exception as e:
+        logging.error(f"Failed to retrieve products for category {category_id}: {str(e)}")
+        return None
+
 
 def validate_authorization(client_user_id,jwt_user_id,roles):
     """

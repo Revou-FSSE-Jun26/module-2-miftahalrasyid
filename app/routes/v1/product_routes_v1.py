@@ -1,7 +1,7 @@
 from flask.views import MethodView
 from flask import jsonify
 from flask_smorest import Blueprint, abort
-from app.schemas import ProductSchema, ProductUpdateSchema, ProductErrorExamples, DeleteActionSchema
+from app.schemas import ProductSchema, ProductUpdateSchema, ProductErrorExamples, DeleteActionSchema, ProductQueryArgs
 from app.services import get_all_products, create_new_product, update_product, get_product_by_id, delete_product, ValidationResponse
 from app.models import Category, UserRole
 from app.services.auth_service import roles_required
@@ -21,10 +21,11 @@ class ProductsRoot(MethodView):
     @product_bp.doc(responses={
         "400": {"description": "Business logic validation failed"},
     })
+    @product_bp.arguments(ProductQueryArgs, location="query")
     @product_bp.response(200, ProductSchema(many=True))
-    def get(self):
-        """Retrieve all products. Supports ?page=1&per_page=10 (max 30)."""
-        result = get_all_products()
+    def get(self, query_args):
+        """Retrieve all products. Supports pagination, search, category/price filters and sorting."""
+        result = get_all_products(query_args)
         if result is None:
             return jsonify({"success": False, "message": "Failed to retrieve products"}), 400
         
