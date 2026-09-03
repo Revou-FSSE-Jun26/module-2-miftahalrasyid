@@ -82,6 +82,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Buyer can only soft-delete orders with `COMPLETED` or `CANCELED` status
 - Duplicate products within same order prevented
 - Subtotal, discount, tax, and total calculated automatically
+- Query params on `GET /api/v1/orders/`: `status` (`PENDING`/`PAID`/`COMPLETED`/`CANCELED`), `sort` (`total`/`created_at`, prefix `-` for descending), plus `page`/`per_page`. Ownership scoping (buyer=own, seller=their products, admin=all) is always enforced and cannot be overridden
 
 ### Products
 - CRUD with ownership enforcement (only owner or admin+ can update/delete)
@@ -90,11 +91,13 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Stock tracked with DB-level `CHECK (stock >= 0)` constraint
 - Category assignment via many-to-many relationship through `category_items` junction table
 - Product image upload support
+- Query params on `GET /api/v1/products/`: `search` (name, case-insensitive), `category_id`, `min_price`, `max_price`, `sort` (`price`/`name`/`created_at`, prefix `-` for descending), plus `page`/`per_page`
 
 ### Categories
 - Only ADMIN and SUPERADMIN can create/update/delete categories
 - Seller and Buyer have read-only access
 - When deleting a category, associated `category_items` junction records are also deleted (no orphan relations)
+- Query params on `GET /api/v1/categories/`: `search` (name, case-insensitive), `sort` (`name`/`created_at`, prefix `-` for descending), plus `page`/`per_page`
 
 ### Users & Profiles
 - Seller cannot be soft-deleted when they have active orders with `PAID` status
@@ -103,6 +106,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Become Seller flow with guard checks (already seller, deactivated account)
 - Profile and address management
 - Default address used for payment processing
+- Query params on `GET /api/v1/users/`: `search` (username or email, case-insensitive), `sort` (`username`/`created_at`, prefix `-` for descending), plus `page`/`per_page`. Privileged filters `role` and `is_active` are honored only for ADMIN/SUPERADMIN and silently ignored for other roles
 
 ### Stock Management
 - Stock deducted only upon successful payment (not on order creation)
@@ -326,6 +330,32 @@ Start the development server:
 flask run --debug --port=8000
 ```
 The API will be available at `http://localhost:8000`.
+
+### Payments (Midtrans) — expose the webhook with ngrok
+
+Payment is processed asynchronously through Midtrans Snap: an order becomes `PAID`
+only after Midtrans calls the webhook `POST /api/v1/payment/notification`. Because
+Midtrans cannot reach `localhost`, you must expose your local server with a tunnel
+during development. **If ngrok is not running, payments will never settle locally.**
+
+Run these in two terminals (both must stay open):
+```bash
+# terminal 1 — the API
+flask run --debug --port=8000
+
+# terminal 2 — public tunnel to port 8000
+./ngrok_tunnel.sh        # or: ngrok http 8000
+```
+ngrok prints a public HTTPS URL (e.g. `https://abc123.ngrok-free.app`). Put it in the
+Midtrans dashboard under **Settings → Configuration → Payment Notification URL** as:
+```
+https://<your-ngrok-subdomain>.ngrok-free.app/api/v1/payment/notification
+```
+The free ngrok URL changes on every restart, so re-paste it each session. First-time
+setup requires `ngrok config add-authtoken <YOUR_NGROK_AUTHTOKEN>`.
+
+Full buyer/seller walkthrough, refund flow, and the dev-vs-production switch-over are in
+[payment_steps_with_midtrans.md](./payment_steps_with_midtrans.md).
 
 ### Example Requests
 
@@ -589,11 +619,9 @@ flowchart TD
 
 ## API Reference
 
-Full interactive documentation available at **[http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)** when running locally.
-
 Github Pages Swagger documentation available at **[https://revou-fsse-jun26.github.io/module-2-miftahalrasyid/](https://revou-fsse-jun26.github.io/module-2-miftahalrasyid/)**
 
-Full interactive documentation available at **[https://module-2-miftahalrasyid.onrender.com/swagger-ui](https://module-2-miftahalrasyid.onrender.com/swagger-ui)** when running on render.
+Full interactive documentation available online at **[https://module-2-miftahalrasyid.onrender.com/swagger-ui](https://module-2-miftahalrasyid.onrender.com/swagger-ui)**.
 
 ### Auth
 
@@ -658,7 +686,10 @@ Full interactive documentation available at **[https://module-2-miftahalrasyid.o
 
 | Method | Endpoint | Description | Auth |
 | :--- | :--- | :--- | :---: |
-| `POST` | `/api/v1/payment/` | Process payment for PENDING order | Bearer |
+| `POST` | `/api/v1/payment/` | Initiate Midtrans Snap payment for a PENDING order (returns snap_token + redirect_url) | Bearer |
+| `POST` | `/api/v1/payment/notification` | Midtrans webhook — settlement transitions order to PAID. Called by Midtrans, not the client | - |
+
+> Local development requires an ngrok tunnel so Midtrans can reach the webhook — see [Payments (Midtrans)](#payments-midtrans--expose-the-webhook-with-ngrok) under Usage and [payment_steps_with_midtrans.md](./payment_steps_with_midtrans.md).
 
 ### Uploads
 

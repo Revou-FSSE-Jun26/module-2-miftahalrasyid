@@ -27,6 +27,9 @@ psycopg2-binary==2.9.12
 alembic==1.19.1
 Mako==1.4.1
 
+# --- Payment gateway ---
+midtransclient==1.4.2
+
 # --- Auth / OAuth ---
 PyJWT==2.13.0
 google-auth==2.56.3
