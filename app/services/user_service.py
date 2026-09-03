@@ -9,15 +9,55 @@ from email_validator import validate_email, EmailNotValidError
 from . import ValidationResponse
 
 
-def get_all_users():
+def get_all_users(filters=None, caller_roles=None):
     """
-    Retrieve all users with pagination.
-    Reads ?page and ?per_page from query params.
+    Retrieve all users with pagination, filtering and sorting.
+
+    RBAC: `role` and `is_active` filters are privileged and only honored for
+    admin/superadmin callers. For any other role they are silently ignored so
+    lower-privilege users cannot enumerate accounts by role or active status.
+
+    Args:
+        filters: validated query-args dict (page, per_page, search, role,
+                 is_active, sort). All optional.
+        caller_roles: the caller's roles from the JWT, used to gate privileged filters.
     """
     from app.utils.pagination import paginate_query
+    filters = filters or {}
+    caller_roles = caller_roles or []
+    is_admin = any(r in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) for r in caller_roles)
     try:
         query = User.query.filter(User.deleted_at.is_(None))
-        return paginate_query(query)
+
+        search = filters.get("search")
+        if search:
+            like = f"%{search}%"
+            query = query.filter(db.or_(User.username.ilike(like), User.email.ilike(like)))
+
+        # Privileged filters: admin/superadmin only.
+        if is_admin:
+            role = filters.get("role")
+            if role:
+                try:
+                    query = query.filter(User.roles.any(UserRole(role)))
+                except ValueError:
+                    pass
+
+            is_active = filters.get("is_active")
+            if is_active is not None:
+                query = query.filter(User.is_active == is_active)
+
+        sort = filters.get("sort")
+        sort_columns = {"username": User.username, "created_at": User.created_at}
+        if sort:
+            descending = sort.startswith("-")
+            column = sort_columns.get(sort.lstrip("-"))
+            if column is not None:
+                query = query.order_by(column.desc() if descending else column.asc())
+        else:
+            query = query.order_by(User.id.asc())
+
+        return paginate_query(query, args=filters)
     except Exception as e:
         logging.error(f"Failed to retrieve users: {str(e)}")
         return None

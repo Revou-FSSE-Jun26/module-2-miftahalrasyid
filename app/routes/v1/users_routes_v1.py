@@ -4,7 +4,7 @@ from flask_smorest import Blueprint, abort
 from flask_jwt_extended import get_jwt_identity, get_jwt
 from app.services.auth_service import roles_required
 from app.models import UserRole
-from app.schemas import UserSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples, DeleteActionSchema, ProfileUpdateSchema
+from app.schemas import UserSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples, DeleteActionSchema, ProfileUpdateSchema, UserQueryArgs
 from app.permissions.field_filter import get_delete_policy
 from app.services.user_service import (
     get_all_users,
@@ -30,11 +30,13 @@ users_bp = Blueprint(
 class UsersRoot(MethodView):
 
     @users_bp.doc(security=[{"BearerAuth": []}])
+    @users_bp.arguments(UserQueryArgs, location="query")
     @users_bp.response(200, UserSchema(many=True))
     @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
-    def get(self):
-        """Show all users. Supports ?page=1&per_page=10 (max 30)."""
-        result = get_all_users()
+    def get(self, query_args):
+        """Show all users. Supports pagination, search, sorting; role/is_active filters are admin-only."""
+        caller_roles = get_jwt().get("roles", [])
+        result = get_all_users(query_args, caller_roles)
         if result is None:
             abort(500, message="Failed to retrieve data from database.")
         return jsonify({

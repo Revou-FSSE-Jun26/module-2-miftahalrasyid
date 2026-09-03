@@ -13,6 +13,9 @@ from .auth_schema import (
     EmailConfirmationResponseSchema,
     AuthErrorExamples,
 )
+from .query_schema import (
+    UserQueryArgs,
+)
 import marshmallow as ma
 from app.utils.sanitizer import SanitizeMixin
 
@@ -60,4 +63,5 @@ __all__ = [
     "TokenResponseSchema",
     "EmailConfirmationResponseSchema",
     "AuthErrorExamples",
+    "UserQueryArgs",
 ]
