@@ -14,6 +14,7 @@ RBAC note:
 import marshmallow as ma
 from app.models import UserRole
 from app.models.order_model import OrderStatus
+from app.utils.sanitizer import SanitizeMixin
 
 
 class PaginationQueryArgs(ma.Schema):
@@ -30,8 +31,10 @@ class PaginationQueryArgs(ma.Schema):
     )
 
 
-class ProductQueryArgs(PaginationQueryArgs):
-    """Filtering/sorting for GET /products/ and category product listings."""
+class ProductQueryArgs(SanitizeMixin, PaginationQueryArgs):
+    """Filtering/sorting for GET /products/ and category product listings.
+    SanitizeMixin strips HTML from the free-text `search` field (XSS defense).
+    """
     search = ma.fields.Str(
         load_default=None,
         metadata={"description": "Case-insensitive match on product name.", "example": "mouse"},
@@ -62,8 +65,10 @@ class ProductQueryArgs(PaginationQueryArgs):
     )
 
 
-class CategoryQueryArgs(PaginationQueryArgs):
-    """Filtering/sorting for GET /categories/."""
+class CategoryQueryArgs(SanitizeMixin, PaginationQueryArgs):
+    """Filtering/sorting for GET /categories/.
+    SanitizeMixin strips HTML from the free-text `search` field (XSS defense).
+    """
     search = ma.fields.Str(
         load_default=None,
         metadata={"description": "Case-insensitive match on category name.", "example": "electronic"},
@@ -93,11 +98,12 @@ class OrderQueryArgs(PaginationQueryArgs):
     )
 
 
-class UserQueryArgs(PaginationQueryArgs):
+class UserQueryArgs(SanitizeMixin, PaginationQueryArgs):
     """
     Filtering for GET /users/.
     `role` and `is_active` are privileged filters: honored only for
     admin/superadmin callers (enforced in the service layer).
+    SanitizeMixin strips HTML from the free-text `search` field (XSS defense).
     """
     search = ma.fields.Str(
         load_default=None,
