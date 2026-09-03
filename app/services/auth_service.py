@@ -317,7 +317,7 @@ def send_verification_email(user):
     """
     email_user = os.environ.get("EMAIL_USER")
     email_pass = os.environ.get("EMAIL_PASS")
-    base_url = os.environ.get("BASE_URL", "http://localhost:5000")
+    base_url = os.environ.get("BASE_URL")
 
     if not email_user or not email_pass:
         logging.error("EMAIL_USER or EMAIL_PASS not configured in .env")
