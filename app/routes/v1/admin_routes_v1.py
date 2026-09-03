@@ -7,7 +7,9 @@ from app.models.user_model import User
 from app.services.auth_service import roles_required
 from app.services.order_service import get_order_items
 from app.utils.pagination import paginate_query
+from app.schemas import AdminProductQueryArgs, AdminOrderQueryArgs
 from flask_jwt_extended import get_jwt
+from sqlalchemy import asc, desc
 
 admin_bp = Blueprint(
     'admin',
@@ -17,6 +19,73 @@ admin_bp = Blueprint(
 )
 
 
+def _apply_admin_product_filters(query, args):
+    """Apply search/category/price/is_active/include_deleted/sort filters for admin product listings."""
+    from app.models.category_model import Category
+
+    args = args or {}
+
+    search = args.get("search")
+    if search:
+        query = query.filter(Product.name.ilike(f"%{search}%"))
+
+    category_id = args.get("category_id")
+    if category_id:
+        query = query.filter(Product.categories.any(Category.id == category_id))
+
+    min_price = args.get("min_price")
+    if min_price is not None:
+        query = query.filter(Product.price >= min_price)
+
+    max_price = args.get("max_price")
+    if max_price is not None:
+        query = query.filter(Product.price <= max_price)
+
+    is_active = args.get("is_active")
+    if is_active is not None:
+        query = query.filter(Product.is_active == is_active)
+
+    # Admin view includes soft-deleted by default; allow opting out.
+    if args.get("include_deleted") is False:
+        query = query.filter(Product.deleted_at.is_(None))
+
+    sort = args.get("sort")
+    sort_columns = {"price": Product.price, "name": Product.name, "created_at": Product.created_at}
+    if sort:
+        column = sort_columns.get(sort.lstrip("-"))
+        if column is not None:
+            query = query.order_by(desc(column) if sort.startswith("-") else asc(column))
+    else:
+        query = query.order_by(Product.id.asc())
+
+    return query
+
+
+def _apply_admin_order_filters(query, args):
+    """Apply status/sort filters for admin order listings."""
+    from app.models.order_model import OrderStatus
+
+    args = args or {}
+
+    status = args.get("status")
+    if status:
+        try:
+            query = query.filter(Order.status == OrderStatus(status))
+        except ValueError:
+            pass
+
+    sort = args.get("sort")
+    sort_columns = {"total": Order.total, "created_at": Order.created_at}
+    if sort:
+        column = sort_columns.get(sort.lstrip("-"))
+        if column is not None:
+            query = query.order_by(desc(column) if sort.startswith("-") else asc(column))
+    else:
+        query = query.order_by(Order.id.asc())
+
+    return query
+
+
 @admin_bp.route('/products')
 class AdminProducts(MethodView):
 
@@ -24,12 +93,13 @@ class AdminProducts(MethodView):
         "401": {"description": "Missing or invalid JWT token"},
         "403": {"description": "Insufficient permissions"},
     })
+    @admin_bp.arguments(AdminProductQueryArgs, location="query")
     @admin_bp.response(200)
     @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
-    def get(self):
-        """Get all products including inactive and soft-deleted (admin/superadmin only). Paginated."""
-        query = Product.query
-        result = paginate_query(query)
+    def get(self, query_args):
+        """Get all products including inactive and soft-deleted (admin/superadmin only). Supports pagination, search, filters and sorting."""
+        query = _apply_admin_product_filters(Product.query, query_args)
+        result = paginate_query(query, args=query_args)
 
         return jsonify({
             "success": True,
@@ -51,16 +121,17 @@ class AdminUserOrders(MethodView):
         "403": {"description": "Insufficient permissions"},
         "404": {"description": "Resource not found"},
     })
+    @admin_bp.arguments(AdminOrderQueryArgs, location="query")
     @admin_bp.response(200)
     @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
-    def get(self, user_id):
-        """Get all orders for a specific user (admin/superadmin only). Paginated."""
+    def get(self, query_args, user_id):
+        """Get all orders for a specific user (admin/superadmin only). Supports pagination, status filter and sorting."""
         user = User.query.get(user_id)
         if not user:
             abort(404, message="User not found")
 
-        query = Order.query.filter(Order.user_id == user_id)
-        result = paginate_query(query)
+        query = _apply_admin_order_filters(Order.query.filter(Order.user_id == user_id), query_args)
+        result = paginate_query(query, args=query_args)
 
         data = []
         for order in result["items"]:
@@ -179,20 +250,23 @@ class AdminCategoryProducts(MethodView):
         "403": {"description": "Insufficient permissions"},
         "404": {"description": "Resource not found"},
     })
+    @admin_bp.arguments(AdminProductQueryArgs, location="query")
     @admin_bp.response(200)
     @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
-    def get(self, category_id):
-        """Get all products in a category including inactive/deleted (admin/superadmin only). Paginated."""
+    def get(self, query_args, category_id):
+        """Get all products in a category including inactive/deleted (admin/superadmin only). Supports pagination, filters and sorting."""
         from app.models.category_model import Category
 
         category = Category.query.get(category_id)
         if not category:
             abort(404, message="Category not found")
 
-        query = Product.query.filter(
-            Product.categories.any(Category.id == category_id)
-        )
-        result = paginate_query(query)
+        # category scoping comes from the path param; drop any category_id filter.
+        scoped_args = dict(query_args or {})
+        scoped_args.pop("category_id", None)
+        query = Product.query.filter(Product.categories.any(Category.id == category_id))
+        query = _apply_admin_product_filters(query, scoped_args)
+        result = paginate_query(query, args=query_args)
 
         return jsonify({
             "success": True,

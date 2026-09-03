@@ -16,6 +16,8 @@ from .auth_schema import (
 from .query_schema import (
     CategoryQueryArgs,
     UserQueryArgs,
+    AdminProductQueryArgs,
+    AdminOrderQueryArgs,
 )
 import marshmallow as ma
 from app.utils.sanitizer import SanitizeMixin
@@ -66,4 +68,6 @@ __all__ = [
     "AuthErrorExamples",
     "CategoryQueryArgs",
     "UserQueryArgs",
+    "AdminProductQueryArgs",
+    "AdminOrderQueryArgs",
 ]
