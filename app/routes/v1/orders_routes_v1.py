@@ -1,7 +1,7 @@
 from flask.views import MethodView
 from flask import jsonify, request
 from flask_smorest import Blueprint, abort
-from app.schemas import OrderSchema, OrderUpdateSchema, DeleteActionSchema, OrderItemSchema, OrderErrorExamples
+from app.schemas import OrderSchema, OrderUpdateSchema, DeleteActionSchema, OrderItemSchema, OrderErrorExamples, OrderQueryArgs
 from app.services.order_service import get_all_orders, get_order_by_id, create_order, update_order, delete_order, get_order_items
 from app.services import ValidationResponse
 from app.models import UserRole
@@ -24,14 +24,15 @@ class OrdersRoot(MethodView):
         "401": {"description": "Missing or invalid JWT token"},
         "403": {"description": "Insufficient permissions"},
     })
+    @order_bp.arguments(OrderQueryArgs, location="query")
     @order_bp.response(200, OrderSchema(many=True))
     @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
-    def get(self):
-        """Retrieve orders. Supports ?page=1&per_page=10 (max 30)."""
+    def get(self, query_args):
+        """Retrieve orders. Supports pagination, status filter and sorting."""
         roles = get_jwt()['roles']
         jwt_user_id = get_jwt_identity()
 
-        result = get_all_orders(jwt_user_id, roles)
+        result = get_all_orders(jwt_user_id, roles, query_args)
         if result is None:
             return jsonify({"success": False, "message": "Failed to retrieve orders"}), 400
 

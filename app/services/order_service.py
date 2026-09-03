@@ -7,14 +7,20 @@ from app.models.order_items_model import Order_item
 from . import ValidationResponse
 
 
-def get_all_orders(jwt_user_id, roles):
+def get_all_orders(jwt_user_id, roles, filters=None):
     """
-    Get orders based on role with pagination.
+    Get orders based on role with pagination, filtering and sorting.
     - Admin/Superadmin: all orders (not soft-deleted)
     - Seller: orders containing their products
     - Buyer: only their own orders
+
+    Ownership scoping is enforced here and cannot be overridden by `filters`.
+
+    Args:
+        filters: validated query-args dict (page, per_page, status, sort). All optional.
     """
     from app.utils.pagination import paginate_query
+    filters = filters or {}
     try:
         is_admin = any(r in (UserRole.ADMIN.value, UserRole.SUPERADMIN.value) for r in roles)
 
@@ -35,7 +41,24 @@ def get_all_orders(jwt_user_id, roles):
                 Order.user_id == int(jwt_user_id)
             )
 
-        return paginate_query(query)
+        status = filters.get("status")
+        if status:
+            try:
+                query = query.filter(Order.status == OrderStatus(status))
+            except ValueError:
+                pass
+
+        sort = filters.get("sort")
+        sort_columns = {"total": Order.total, "created_at": Order.created_at}
+        if sort:
+            descending = sort.startswith("-")
+            column = sort_columns.get(sort.lstrip("-"))
+            if column is not None:
+                query = query.order_by(column.desc() if descending else column.asc())
+        else:
+            query = query.order_by(Order.id.asc())
+
+        return paginate_query(query, args=filters)
     except Exception as e:
         logging.error(f"Failed to retrieve orders: {str(e)}")
         return None

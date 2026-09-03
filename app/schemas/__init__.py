@@ -16,6 +16,7 @@ from .auth_schema import (
 from .query_schema import (
     ProductQueryArgs,
     CategoryQueryArgs,
+    OrderQueryArgs,
     UserQueryArgs,
     AdminProductQueryArgs,
     AdminOrderQueryArgs,
@@ -69,6 +70,7 @@ __all__ = [
     "AuthErrorExamples",
     "ProductQueryArgs",
     "CategoryQueryArgs",
+    "OrderQueryArgs",
     "UserQueryArgs",
     "AdminProductQueryArgs",
     "AdminOrderQueryArgs",
