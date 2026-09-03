@@ -1,8 +1,9 @@
 from flask.views import MethodView
 from flask import jsonify
 from flask_smorest import Blueprint, abort
-from app.schemas import CategorySchema, CategoryUpdateSchema, DeleteActionSchema
+from app.schemas import CategorySchema, CategoryUpdateSchema, DeleteActionSchema, CategoryQueryArgs, ProductQueryArgs
 from app.services import get_all_categories, get_category_by_id, create_category, update_category, delete_category, ValidationResponse
+from app.services.product_service import get_products_by_category
 from app.models import UserRole
 from app.services.auth_service import roles_required
 from app.permissions.field_filter import get_allowed_fields
@@ -22,10 +23,11 @@ class CategoriesRoot(MethodView):
     @category_bp.doc(responses={
         "400": {"description": "Business logic validation failed"},
     })
+    @category_bp.arguments(CategoryQueryArgs, location="query")
     @category_bp.response(200, CategorySchema(many=True))
-    def get(self):
-        """Retrieve all categories. Supports ?page=1&per_page=10 (max 30)."""
-        result = get_all_categories()
+    def get(self, query_args):
+        """Retrieve all categories. Supports pagination, search and sorting."""
+        result = get_all_categories(query_args)
         if result is None:
             return jsonify({"success": False, "message": "Failed to retrieve categories"}), 400
 
@@ -165,23 +167,17 @@ class CategoryProducts(MethodView):
     @category_bp.doc(responses={
         "404": {"description": "Resource not found"},
     })
+    @category_bp.arguments(ProductQueryArgs, location="query")
     @category_bp.response(200, CategorySchema)
-    def get(self, id):
-        """Get all active products under a specific category (public)."""
-        from app.models import Product, Category
-        from app.utils.pagination import paginate_query
-
+    def get(self, query_args, id):
+        """Get all active products under a specific category (public). Supports pagination, search, price filters and sorting."""
         category = get_category_by_id(id)
         if not category:
             abort(404, message="Category not found")
 
-        query = Product.query.filter(
-            Product.deleted_at.is_(None),
-            Product.is_active == True,
-            Product.categories.any(Category.id == id)
-        )
-
-        result = paginate_query(query)
+        result = get_products_by_category(id, query_args)
+        if result is None:
+            return jsonify({"success": False, "message": "Failed to retrieve products"}), 400
 
         return jsonify({
             "success": True,

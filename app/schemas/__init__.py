@@ -14,6 +14,7 @@ from .auth_schema import (
     AuthErrorExamples,
 )
 from .query_schema import (
+    CategoryQueryArgs,
     UserQueryArgs,
 )
 import marshmallow as ma
@@ -63,5 +64,6 @@ __all__ = [
     "TokenResponseSchema",
     "EmailConfirmationResponseSchema",
     "AuthErrorExamples",
+    "CategoryQueryArgs",
     "UserQueryArgs",
 ]

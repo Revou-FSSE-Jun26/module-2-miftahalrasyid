@@ -6,15 +6,33 @@ from app.models import Category, UserRole
 from . import ValidationResponse
 
 
-def get_all_categories():
+def get_all_categories(filters=None):
     """
-    Get all active categories with pagination.
-    Reads ?page and ?per_page from query params.
+    Get all active categories with pagination, filtering and sorting.
+
+    Args:
+        filters: validated query-args dict (page, per_page, search, sort). All optional.
     """
     from app.utils.pagination import paginate_query
+    filters = filters or {}
     try:
         query = Category.query.filter(Category.deleted_at.is_(None))
-        return paginate_query(query)
+
+        search = filters.get("search")
+        if search:
+            query = query.filter(Category.name.ilike(f"%{search}%"))
+
+        sort = filters.get("sort")
+        sort_columns = {"name": Category.name, "created_at": Category.created_at}
+        if sort:
+            descending = sort.startswith("-")
+            column = sort_columns.get(sort.lstrip("-"))
+            if column is not None:
+                query = query.order_by(column.desc() if descending else column.asc())
+        else:
+            query = query.order_by(Category.id.asc())
+
+        return paginate_query(query, args=filters)
     except Exception as e:
         logging.error(f"Failed to retrieve categories: {str(e)}")
         return None
