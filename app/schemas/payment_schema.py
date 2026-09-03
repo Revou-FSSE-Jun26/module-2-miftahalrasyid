@@ -37,10 +37,39 @@ class PaymentOrderDataSchema(ma.Schema):
 
 
 class PaymentResponseSchema(ma.Schema):
-    """Response schema for successful payment (200)."""
+    """
+    Response schema for a successful payment initiation (200/201).
+    Order stays PENDING until Midtrans confirms settlement via webhook.
+    Client redirects the user to `redirect_url` (or uses `snap_token` with Snap.js).
+    """
     success = ma.fields.Bool(metadata={"example": True})
-    message = ma.fields.Str(metadata={"example": "Payment processed successfully"})
+    message = ma.fields.Str(metadata={"example": "Payment initiated. Complete payment via redirect_url."})
+    snap_token = ma.fields.Str(metadata={"example": "66e4fa55-fdac-4ef9-91b5-733b97d1b862"})
+    redirect_url = ma.fields.Str(metadata={"example": "https://app.sandbox.midtrans.com/snap/v3/redirection/66e4fa55-..."})
     data = ma.fields.Nested(PaymentOrderDataSchema)
+
+
+class PaymentNotificationSchema(SanitizeMixin, ma.Schema):
+    """
+    Midtrans webhook payload (subset of fields we rely on).
+    Called server-to-server by Midtrans, not by the client — no JWT.
+    Unknown fields are ignored so Midtrans can add fields without breaking us.
+    """
+    class Meta:
+        unknown = ma.EXCLUDE
+
+    order_id = ma.fields.Str(required=True, metadata={"description": "Our payment_ref (ORDER-{id}-{ts})"})
+    status_code = ma.fields.Str(required=False, load_default="")
+    gross_amount = ma.fields.Str(required=False, load_default="")
+    signature_key = ma.fields.Str(required=False, load_default="")
+    transaction_status = ma.fields.Str(required=False, load_default=None, allow_none=True)
+    fraud_status = ma.fields.Str(required=False, load_default=None, allow_none=True)
+
+
+class PaymentNotificationResponseSchema(ma.Schema):
+    """Response returned to Midtrans after processing a webhook."""
+    success = ma.fields.Bool(metadata={"example": True})
+    message = ma.fields.Str(metadata={"example": "Payment settled, order PAID"})
 
 
 class PaymentErrorExamples:

@@ -26,8 +26,15 @@ def create_app():
     app.config['TAX_PERCENT'] = float(os.environ.get("TAX_PERCENT", 11))
     app.config['CURRENCY'] = os.environ.get("CURRENCY", "IDR")
 
+    # --- Midtrans payment gateway ---
+    app.config['MIDTRANS_SERVER_KEY'] = os.environ.get("MIDTRANS_SERVER_KEY")
+    app.config['MIDTRANS_CLIENT_KEY'] = os.environ.get("MIDTRANS_CLIENT_KEY")
+    app.config['MIDTRANS_IS_PRODUCTION'] = (
+        os.environ.get("MIDTRANS_IS_PRODUCTION", "false").lower() == "true"
+    )
+
     # --- Swagger UI / Flask-Smorest Configuration ---
-    app.config["API_TITLE"] = "Rovodev Shop API"
+    app.config["API_TITLE"] = "Revodev Shop API"
     app.config["API_VERSION"] = "v1"
     app.config["OPENAPI_VERSION"] = "3.0.3"
     app.config["OPENAPI_URL_PREFIX"] = "/"

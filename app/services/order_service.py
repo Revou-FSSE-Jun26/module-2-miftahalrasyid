@@ -293,8 +293,15 @@ def update_order(order_id, update_data, jwt_user_id, roles):
                     message=f"Invalid status transition from {order.status.value} to {new_status_enum.value}. Allowed: PENDING → PAID, PAID → COMPLETED or PAID → CANCELED"
                 )
 
-            # If transitioning to CANCELED, restore stock
+            # If transitioning to CANCELED: refund the buyer (if paid via gateway),
+            # then restore stock to the seller.
             if new_status_enum == OrderStatus.CANCELED:
+                refund_result = _refund_payment(order)
+                if isinstance(refund_result, ValidationResponse) and not refund_result.success:
+                    # Gateway refused the refund — abort the cancellation entirely.
+                    # Do NOT restore stock or change status, so money and inventory stay consistent.
+                    db.session.rollback()
+                    return refund_result
                 _restore_stock(order.id)
 
         # Apply allowed fields
@@ -418,6 +425,59 @@ def _validate_status_transition(current_status, new_status):
 
     allowed = allowed_transitions.get(current_status, set())
     return new_status in allowed
+
+
+def _refund_payment(order):
+    """
+    Issue a full refund through Midtrans for a PAID order being canceled.
+
+    Behavior:
+      - Orders with no payment_ref (legacy/seeded, or never paid via the gateway)
+        skip the gateway call entirely — nothing to refund. Returns success.
+      - Orders whose gateway payment_status is "settlement" are refunded for the
+        full order total. On success payment_status is set to "refund".
+      - Any gateway error returns a failed ValidationResponse so the caller can
+        abort the cancellation (keeping money and stock consistent).
+
+    Returns:
+        ValidationResponse (success=True when refund done or not needed;
+        success=False when the gateway refused).
+    """
+    import time
+    import logging
+
+    # No gateway reference -> not a real Midtrans payment; nothing to refund.
+    if not order.payment_ref:
+        return ValidationResponse(success=True, message="No gateway payment to refund", status_code=200)
+
+    # Only settled payments can be refunded. Non-settled (e.g. still pending) are
+    # canceled at the gateway instead; treat as no-op here to avoid false refunds.
+    if order.payment_status != "settlement":
+        logging.info(
+            f"Order {order.id} cancel: payment_status='{order.payment_status}', "
+            f"skipping refund (not a settled payment)"
+        )
+        return ValidationResponse(success=True, message="No settled payment to refund", status_code=200)
+
+    try:
+        from app.services.midtrans_client import get_snap_client
+
+        snap = get_snap_client()
+        snap.transaction.refund(order.payment_ref, {
+            "refund_key": f"refund-{order.id}-{int(time.time())}",
+            "amount": int(round(float(order.total))),
+            "reason": "Order canceled",
+        })
+        order.payment_status = "refund"
+        logging.info(f"Refund issued for order {order.id} (ref={order.payment_ref})")
+        return ValidationResponse(success=True, message="Refund issued", status_code=200)
+    except Exception as e:
+        logging.error(f"Refund failed for order {order.id} (ref={order.payment_ref}): {str(e)}")
+        return ValidationResponse(
+            success=False,
+            message="Failed to process refund with the payment gateway. Cancellation aborted.",
+            status_code=502
+        )
 
 
 def _restore_stock(order_id):

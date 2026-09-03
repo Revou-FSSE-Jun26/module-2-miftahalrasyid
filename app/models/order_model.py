@@ -30,6 +30,10 @@ class Order(db.Model):
     total            = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     created_at       = db.Column(db.DateTime(timezone=True), server_default=func.now())
     deleted_at       = db.Column(db.DateTime(timezone=True), nullable=True)
+    # Midtrans payment reference (ORDER-{id}-{ts}) sent to the gateway; used for refunds.
+    payment_ref      = db.Column(db.String(100), unique=True, nullable=True)
+    # Gateway-side status (e.g. pending, settlement, refund, expire); distinct from business `status`.
+    payment_status   = db.Column(db.String(30), nullable=True)
 
     products = db.relationship('Product', secondary='order_items', backref='orders', viewonly=True)
     address  = db.relationship('Address', backref='orders')
@@ -47,6 +51,8 @@ class Order(db.Model):
             "tax_percent"      : float(self.tax_percent),
             "tax_amount"       : float(self.tax_amount),
             "total"            : float(self.total),
+            "payment_ref"      : self.payment_ref,
+            "payment_status"   : self.payment_status,
             "created_at"       : self.created_at.isoformat() if self.created_at else None,
             "deleted_at"       : self.deleted_at.isoformat() if self.deleted_at else None,
         }
