@@ -14,6 +14,7 @@ from .auth_schema import (
     AuthErrorExamples,
 )
 from .query_schema import (
+    PaginationQueryArgs,
     ProductQueryArgs,
     CategoryQueryArgs,
     OrderQueryArgs,
@@ -68,6 +69,7 @@ __all__ = [
     "TokenResponseSchema",
     "EmailConfirmationResponseSchema",
     "AuthErrorExamples",
+    "PaginationQueryArgs",
     "ProductQueryArgs",
     "CategoryQueryArgs",
     "OrderQueryArgs",
