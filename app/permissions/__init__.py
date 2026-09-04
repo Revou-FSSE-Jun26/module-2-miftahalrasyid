@@ -67,25 +67,25 @@ FIELD_PERMISSIONS = {
     "products": {
         "SUPERADMIN": {
             "create": {"user_id", "name", "stock", "brand", "description", "price", "is_active", "sku", "category_ids"},
-            "read":   {"id", "user_id", "name", "stock", "brand", "description", "price", "created_at", "is_active", "sku", "deleted_at", "categories"},
+            "read":   {"id", "user_id", "name", "slug", "stock", "brand", "description", "price", "created_at", "is_active", "sku", "images", "categories", "deleted_at"},
             "update": {"user_id", "name", "stock", "brand", "description", "price", "is_active", "sku", "category_ids"},
             "delete": "hard",
         },
         "ADMIN": {
             "create": {"user_id", "name", "stock", "brand", "description", "price", "is_active", "sku", "category_ids"},
-            "read":   {"id", "user_id", "name", "stock", "brand", "description", "price", "created_at", "is_active", "sku", "deleted_at", "categories"},
+            "read":   {"id", "user_id", "name", "slug", "stock", "brand", "description", "price", "created_at", "is_active", "sku", "images", "categories", "deleted_at"},
             "update": {"user_id", "name", "stock", "brand", "description", "price", "is_active", "sku", "category_ids"},
             "delete": "soft",
         },
         "SELLER": {
             "create": {"name", "stock", "brand", "description", "price", "sku", "category_ids"},
-            "read":   {"id", "user_id", "name", "stock", "brand", "description", "price", "created_at", "is_active", "sku", "categories"},
+            "read":   {"id", "user_id", "name", "slug", "stock", "brand", "description", "price", "created_at", "is_active", "sku", "images", "categories"},
             "update": {"name", "stock", "brand", "description", "price", "sku", "category_ids"},
             "delete": "soft",
         },
         "BUYER": {
             "create": set(),
-            "read":   {"id", "name", "stock", "brand", "description", "price", "created_at", "sku", "categories"},
+            "read":   {"id", "user_id", "name", "slug", "stock", "brand", "description", "price", "created_at", "sku", "images", "categories"},
             "update": set(),
             "delete": None,
         },

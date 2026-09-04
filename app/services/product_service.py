@@ -43,6 +43,12 @@ def _apply_product_filters(query, filters):
     if category_id:
         query = query.filter(Product.categories.any(Category.id == category_id))
 
+    category_name = filters.get("category_name")
+    if category_name:
+        # Partial, case-insensitive match on category name. Unknown names simply
+        # yield no matching products (empty result, not a 404).
+        query = query.filter(Product.categories.any(Category.name.ilike(f"%{category_name}%")))
+
     min_price = filters.get("min_price")
     if min_price is not None:
         query = query.filter(Product.price >= min_price)
@@ -96,30 +102,6 @@ def get_product_by_id(product_id):
         logging.error(f"Failed to retrieve product {product_id}: {str(e)}")
         return None
 
-def get_products_by_category(category_id, filters=None):
-    """
-    Get active products under a specific category with pagination/filtering/sorting.
-
-    Args:
-        category_id: category to scope to.
-        filters: validated query-args dict (page, per_page, search,
-                 min_price, max_price, sort). All optional.
-    """
-    from app.utils.pagination import paginate_query
-    try:
-        query = Product.query.filter(
-            Product.deleted_at.is_(None),
-            Product.is_active == True,
-            Product.categories.any(Category.id == category_id),
-        )
-        # category_id from filters is ignored here; the path param wins.
-        scoped_filters = dict(filters or {})
-        scoped_filters.pop("category_id", None)
-        query = _apply_product_filters(query, scoped_filters)
-        return paginate_query(query, args=filters)
-    except Exception as e:
-        logging.error(f"Failed to retrieve products for category {category_id}: {str(e)}")
-        return None
 
 
 def validate_authorization(client_user_id,jwt_user_id,roles):

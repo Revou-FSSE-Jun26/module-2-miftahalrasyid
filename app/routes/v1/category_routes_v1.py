@@ -1,9 +1,8 @@
 from flask.views import MethodView
 from flask import jsonify
 from flask_smorest import Blueprint, abort
-from app.schemas import CategorySchema, CategoryUpdateSchema, DeleteActionSchema, CategoryQueryArgs, ProductQueryArgs
+from app.schemas import CategorySchema, CategoryUpdateSchema, DeleteActionSchema, CategoryQueryArgs
 from app.services import get_all_categories, get_category_by_id, create_category, update_category, delete_category, ValidationResponse
-from app.services.product_service import get_products_by_category
 from app.models import UserRole
 from app.services.auth_service import roles_required
 from app.permissions.field_filter import get_allowed_fields
@@ -161,31 +160,7 @@ class CategoryDetail(MethodView):
         return jsonify({"success": True, "message": result.message}), result.status_code
 
 
-@category_bp.route('/<int:id>/products')
-class CategoryProducts(MethodView):
-
-    @category_bp.doc(responses={
-        "404": {"description": "Resource not found"},
-    })
-    @category_bp.arguments(ProductQueryArgs, location="query")
-    @category_bp.response(200, CategorySchema)
-    def get(self, query_args, id):
-        """Get all active products under a specific category (public). Supports pagination, search, price filters and sorting."""
-        category = get_category_by_id(id)
-        if not category:
-            abort(404, message="Category not found")
-
-        result = get_products_by_category(id, query_args)
-        if result is None:
-            return jsonify({"success": False, "message": "Failed to retrieve products"}), 400
-
-        return jsonify({
-            "success": True,
-            "message": f"Products in category '{category.name}'",
-            "data": [p.to_dict() for p in result["items"]],
-            "pagination": {
-                "page": result["page"],
-                "per_page": result["per_page"],
-                "total": result["count"],
-            }
-        }), 200
+# NOTE: GET /categories/<id>/products was removed. Product listing by category
+# is now handled by GET /products/?category_id=<id> or ?category_name=<text>,
+# avoiding a redundant endpoint. Admin product-by-category views live under
+# GET /admin/products?category_id=<id>.

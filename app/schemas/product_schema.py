@@ -12,7 +12,11 @@ class ProductSchema(SanitizeMixin, SQLAlchemyAutoSchema):
         sqla_session          = db.session
         include_fk            = True        # Include foreign keys like user_id
         include_relationships = False       # Don't auto-include relationships
-        exclude               = ('seller', 'categories', 'uuid')  # Exclude from API input/output
+        # Exclude server-controlled columns so they never appear in the request body:
+        #  - seller/categories/uuid: relationships / internal id
+        #  - images: set only by the uploads endpoint
+        #  - updated_at: server-managed timestamp
+        exclude               = ('seller', 'categories', 'uuid','deleted_at')
 
     # --- Required fields ---
     name        = ma.fields.Str(
@@ -48,7 +52,11 @@ class ProductSchema(SanitizeMixin, SQLAlchemyAutoSchema):
         allow_none   = True,
         metadata     = {"example": "SKU-LAPTOP-001"}
     )
-
+    # -- Output only fields
+    images = ma.fields.List( ma.fields.Str(), dump_only=True)
+    slug = ma.fields.Str(dump_only=True)
+    updated_at = ma.fields.DateTime(dump_only=True)
+    
     # Category IDs: Optional list of category IDs to link to the product.
     # This field is NOT on the model — we intercept it in pre_load so it never
     # reaches the Product() constructor. The route handler reads it back from
@@ -72,18 +80,12 @@ class ProductSchema(SanitizeMixin, SQLAlchemyAutoSchema):
         metadata     = {"description": "Owner user ID. Sellers: auto-assigned. Admin/Superadmin: can specify."}
     )
     
-    # Slug: auto-generated from product name in the service layer.
-    # Accepted in input but not required — popped in pre_load.
-    slug = ma.fields.Str(
-        required     = False,
-        load_default = None,
-        load_only    = True,
-    )
+    # slug is excluded from input (see Meta.exclude); the service auto-generates
+    # it from the product name.
 
     # --- dump_only: server-generated, never in request body ---
     id         = ma.fields.Int(dump_only=True)
     created_at = ma.fields.DateTime(dump_only=True)
-    deleted_at = ma.fields.DateTime(dump_only=True)
 
     @ma.pre_load
     def pop_category_ids(self, data, **kwargs):

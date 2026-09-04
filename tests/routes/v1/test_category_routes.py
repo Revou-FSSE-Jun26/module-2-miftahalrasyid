@@ -154,7 +154,9 @@ class TestCategoryIntegrationCRUD:
         resp = client.delete(f'/api/v1/categories/{cat.id}', headers=headers, json={'action': 'hard'})
         assert resp.status_code == 200
 
-    def test_get_category_products(self, app, db_session, client):
+    def test_get_products_by_category(self, app, db_session, client):
+        # The dedicated /categories/<id>/products route was removed; product
+        # listing by category now uses /products?category_id= (or category_name).
         seller = User(username='catseller', email='catseller@test.com', age=30, is_active=True,
             provider=AuthProvider.PASSWORD_HASH, provider_key=generate_password_hash('p'),
             roles=[UserRole.SELLER])
@@ -168,6 +170,13 @@ class TestCategoryIntegrationCRUD:
         prod.categories = [cat]
         db_session.add(prod)
         db_session.commit()
-        resp = client.get(f'/api/v1/categories/{cat.id}/products')
+
+        # Filter by category id
+        resp = client.get(f'/api/v1/products/?category_id={cat.id}')
+        assert resp.status_code == 200
+        assert len(resp.get_json()['data']) >= 1
+
+        # Filter by category name (partial, case-insensitive)
+        resp = client.get('/api/v1/products/?category_name=catprod')
         assert resp.status_code == 200
         assert len(resp.get_json()['data']) >= 1
