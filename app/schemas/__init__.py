@@ -1,4 +1,4 @@
-from .user_schema import UserSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples
+from .user_schema import UserSchema, UserCreateSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples
 from .product_schema import ProductSchema, ProductUpdateSchema, ProductErrorExamples
 from .order_schema import OrderSchema, OrderUpdateSchema
 from .order_item_schema import OrderItemSchema, OrderErrorExamples, OrderUpdateSuccessResponseSchema
@@ -9,8 +9,10 @@ from .auth_schema import (
     RegisterSchema,
     LoginSchema,
     OAuthGoogleSchema,
+    ResendVerificationSchema,
     TokenResponseSchema,
     EmailConfirmationResponseSchema,
+    ResendVerificationResponseSchema,
     AuthErrorExamples,
 )
 from .query_schema import (
@@ -45,6 +47,7 @@ class DeleteActionSchema(SanitizeMixin, ma.Schema):
 
 __all__ = [
     "UserSchema",
+    "UserCreateSchema",
     "ProductSchema",
     "ProductUpdateSchema",
     "ProductErrorExamples",
@@ -66,8 +69,10 @@ __all__ = [
     "RegisterSchema",
     "LoginSchema",
     "OAuthGoogleSchema",
+    "ResendVerificationSchema",
     "TokenResponseSchema",
     "EmailConfirmationResponseSchema",
+    "ResendVerificationResponseSchema",
     "AuthErrorExamples",
     "PaginationQueryArgs",
     "ProductQueryArgs",

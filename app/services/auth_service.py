@@ -262,6 +262,49 @@ def oauth_google_login(token, age):
 
 
 # =============================================================================
+# RESEND VERIFICATION EMAIL
+# =============================================================================
+
+def resend_verification_email(email):
+    """
+    Resend the email verification link for an account that registered but is
+    not yet active (e.g. the original email failed to send).
+
+    Security: always returns a generic success message so the endpoint cannot
+    be used to probe which emails are registered.
+
+    Returns a dict on success (or generic no-op), ValidationResponse on hard error.
+    """
+    validated_email = normalize_and_validate_email(email)
+    if validated_email is None:
+        return ValidationResponse(success=False, message="Email format is wrong.")
+
+    generic = {"message": "If the email is registered and unverified, a verification link has been sent."}
+
+    user = User.query.filter_by(email=validated_email).first()
+
+    # No account, soft-deleted, or OAuth account -> silent no-op (don't leak state)
+    if user is None or user.deleted_at is not None:
+        return generic
+    if user.provider != AuthProvider.PASSWORD_HASH:
+        return generic
+
+    # Already verified -> nothing to resend
+    if user.is_active:
+        return {"message": "Email is already verified."}
+
+    sent = send_verification_email(user)
+    if not sent:
+        return ValidationResponse(
+            success=False,
+            message="Failed to send verification email. Please try again later.",
+            status_code=502
+        )
+
+    return generic
+
+
+# =============================================================================
 # EMAIL CONFIRMATION
 # =============================================================================
 
@@ -323,6 +366,14 @@ def send_verification_email(user):
         logging.error("EMAIL_USER or EMAIL_PASS not configured in .env")
         return False
 
+    if not base_url:
+        logging.error("BASE_URL not configured in .env; verification link would be broken")
+        return False
+
+    # Gmail app passwords are 16 chars, often pasted with spaces ("xxxx xxxx ...").
+    # Strip spaces so a copy/paste with spaces still authenticates.
+    email_pass = email_pass.replace(" ", "")
+
     # Generate confirmation token
     token = generate_email_confirmation_token(user)
     confirmation_url = f"{base_url}/api/v1/auth/email_confirmation?token={token}"
@@ -353,12 +404,33 @@ def send_verification_email(user):
 
     msg.attach(MIMEText(html_body, "html"))
 
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(email_user, email_pass)
-            server.sendmail(email_user, user.email, msg.as_string())
-        logging.info(f"Verification email sent to {user.email}")
-        return True
-    except Exception as e:
-        logging.error(f"Failed to send verification email: {str(e)}")
-        return False
+    # Retry once on transient failures (network hiccup, timeout, temporary
+    # Gmail 4xx). A single retry avoids most spurious 502s without hammering.
+    last_error = None
+    for attempt in range(1, 3):
+        try:
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as server:
+                server.login(email_user, email_pass)
+                server.sendmail(email_user, user.email, msg.as_string())
+            logging.info(f"Verification email sent to {user.email} (attempt {attempt})")
+            return True
+        except smtplib.SMTPAuthenticationError as e:
+            # Bad credentials never succeed on retry — fail fast.
+            logging.error(
+                f"SMTP auth failed sending to {user.email}: {e.smtp_code} {e.smtp_error}. "
+                f"Check EMAIL_USER/EMAIL_PASS (Gmail requires a 16-char App Password)."
+            )
+            return False
+        except smtplib.SMTPRecipientsRefused as e:
+            # Recipient address rejected — retry won't help.
+            logging.error(f"SMTP recipient refused for {user.email}: {e.recipients}")
+            return False
+        except Exception as e:
+            last_error = e
+            logging.warning(
+                f"Verification email attempt {attempt} to {user.email} failed: "
+                f"{type(e).__name__} -> {str(e)}"
+            )
+
+    logging.error(f"Failed to send verification email to {user.email} after retries: {last_error}")
+    return False

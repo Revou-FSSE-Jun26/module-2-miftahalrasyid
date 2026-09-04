@@ -5,8 +5,10 @@ from app.schemas import (
     RegisterSchema,
     LoginSchema,
     OAuthGoogleSchema,
+    ResendVerificationSchema,
     TokenResponseSchema,
     EmailConfirmationResponseSchema,
+    ResendVerificationResponseSchema,
     AuthErrorExamples,
 )
 from app.services.auth_service import (
@@ -14,6 +16,7 @@ from app.services.auth_service import (
     login_user,
     oauth_google_login,
     confirm_email,
+    resend_verification_email,
 )
 from app.services.user_service import ValidationResponse
 
@@ -188,6 +191,36 @@ class AuthOAuthGoogle(MethodView):
 
         if isinstance(result, ValidationResponse):
             abort(400, message=result.message)
+
+        return result
+
+
+@auth_bp.route('/resend_verification')
+class AuthResendVerification(MethodView):
+
+    @auth_bp.doc(responses={
+        "422": {
+            "description": "Validation Failures",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "EmailInvalid": AuthErrorExamples.EMAIL_INVALID,
+                    }
+                }
+            }
+        },
+        "502": {
+            "description": "Email delivery failed",
+        }
+    })
+    @auth_bp.arguments(ResendVerificationSchema, location="json")
+    @auth_bp.response(200, ResendVerificationResponseSchema)
+    def post(self, data):
+        """Resend the verification email for a registered but unverified account."""
+        result = resend_verification_email(email=data["email"])
+
+        if isinstance(result, ValidationResponse):
+            abort(result.status_code, message=result.message)
 
         return result
 

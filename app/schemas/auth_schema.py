@@ -45,6 +45,17 @@ class LoginSchema(SanitizeMixin, ma.Schema):
     )
 
 
+class ResendVerificationSchema(SanitizeMixin, ma.Schema):
+    """Schema for POST /auth/resend_verification"""
+    email = ma.fields.Email(
+        required=True,
+        error_messages={
+            "required": "Email is not provided.",
+            "invalid": "Email format is wrong."
+        }
+    )
+
+
 class OAuthGoogleSchema(SanitizeMixin, ma.Schema):
     """Schema for POST /auth/oauth/google (Google OAuth login/register)"""
     id_token = ma.fields.Str(
@@ -79,6 +90,14 @@ class EmailConfirmationResponseSchema(ma.Schema):
     """Response schema for email confirmation"""
     message = ma.fields.Str(required=True, metadata={"example": "Email verified successfully."})
     is_active = ma.fields.Bool(required=True, metadata={"example": True})
+
+
+class ResendVerificationResponseSchema(ma.Schema):
+    """Response schema for resend verification email"""
+    message = ma.fields.Str(
+        required=True,
+        metadata={"example": "If the email is registered and unverified, a verification link has been sent."}
+    )
 
 
 # =============================================================================
