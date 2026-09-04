@@ -4,7 +4,7 @@ from flask_smorest import Blueprint, abort
 from flask_jwt_extended import get_jwt_identity, get_jwt
 from app.services.auth_service import roles_required
 from app.models import UserRole
-from app.schemas import UserSchema, UserCreateSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples, DeleteActionSchema, ProfileUpdateSchema, UserQueryArgs
+from app.schemas import UserSchema, UserCreateSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, BecomeSellerResponseSchema, UserErrorExamples, DeleteActionSchema, ProfileUpdateSchema, UserQueryArgs
 from app.permissions.field_filter import get_delete_policy
 from app.services.user_service import (
     get_all_users,
@@ -154,19 +154,36 @@ class UserBecomeSeller(MethodView):
 
     @users_bp.doc(responses=UserErrorExamples.RESPONSES_BECOME_SELLER, security=[{"BearerAuth": []}])
     @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
-    @users_bp.response(200, UserSchema)
+    @users_bp.response(200, BecomeSellerResponseSchema)
     def post(self):
         """
         Activate seller role for the current user.
         Adds SELLER to the user's role array. Requires JWT Bearer token.
         """
         current_user_id = int(get_jwt_identity())
+        caller_roles = get_jwt().get("roles", [])
+        is_admin = any(r in ("ADMIN", "SUPERADMIN") for r in caller_roles)
 
         result = become_seller(current_user_id)
-        if isinstance(result, ValidationResponse):
-            abort(400, message=result.message)
 
-        return result
+        # ValidationResponse: success=True -> already a seller (200);
+        # success=False -> real error (400).
+        if isinstance(result, ValidationResponse):
+            if not result.success:
+                abort(400, message=result.message)
+            return {"success": True, "message": result.message}
+
+        response = {
+            "success": True,
+            "message": "You are a seller now",
+        }
+        # Only admin/superadmin may see the roles data.
+        if is_admin:
+            response["data"] = {
+                "id": result.id,
+                "roles": [r.value for r in result.roles] if result.roles else [],
+            }
+        return response
 
 
 @users_bp.route('/me')

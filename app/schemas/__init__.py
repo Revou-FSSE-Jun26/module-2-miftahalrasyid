@@ -1,4 +1,4 @@
-from .user_schema import UserSchema, UserCreateSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples
+from .user_schema import UserSchema, UserCreateSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, BecomeSellerResponseSchema, UserErrorExamples
 from .product_schema import ProductSchema, ProductUpdateSchema, ProductErrorExamples
 from .order_schema import OrderSchema, OrderUpdateSchema
 from .order_item_schema import OrderItemSchema, OrderErrorExamples, OrderUpdateSuccessResponseSchema
@@ -65,6 +65,7 @@ __all__ = [
     "AddressUpdateSchema",
     "UserUpdateFormSchema",
     "UserUpdateSuccessResponseSchema",
+    "BecomeSellerResponseSchema",
     "UserErrorExamples",
     "RegisterSchema",
     "LoginSchema",

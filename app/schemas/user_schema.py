@@ -15,6 +15,10 @@ class UserSchema(SanitizeMixin, SQLAlchemyAutoSchema):
     # --- dump_only: not required during POST input ---
     username = ma.fields.Str(dump_only=True)
     provider_key = ma.fields.Str(dump_only=True)
+    # provider is server-controlled (set by register/OAuth flows), never client input.
+    # Declaring it as a plain Str dump_only field also overrides the auto-generated
+    # Enum field whose Length validator crashes on the AuthProvider enum member.
+    provider = ma.fields.Str(dump_only=True)
 
     # --- Input Validation & Custom Error Messages ---
     email = ma.fields.Email(
@@ -47,6 +51,17 @@ class UserSchema(SanitizeMixin, SQLAlchemyAutoSchema):
         """
         Strip whitespace from all string inputs before validation.
         """
+        if isinstance(data, dict):
+            # Drop server-controlled fields if a client sends them, so they are
+            # ignored rather than raising "Unknown field" on a dump_only field.
+            for server_field in ('provider', 'provider_key', 'username'):
+                data.pop(server_field, None)
+            for field in ('email', 'password'):
+                if field in data and isinstance(data[field], str):
+                    data[field] = data[field].strip()
+        return data
+
+
 class UserCreateSchema(SanitizeMixin, SQLAlchemyAutoSchema):
     """
     Input-only schema for POST /users. Declaring the writable fields explicitly
@@ -352,6 +367,19 @@ class UpdateFieldsContainerSchema(ma.Schema):
 # Main outer wrapper class to be used in routes
 class UserUpdateSuccessResponseSchema(ma.Schema):
     form = ma.fields.Nested(UpdateFieldsContainerSchema, required=True)
+
+
+class BecomeSellerDataSchema(ma.Schema):
+    """The `data` payload returned by POST /users/become-seller."""
+    id = ma.fields.Int(metadata={"example": 8})
+    roles = ma.fields.List(ma.fields.Str(), metadata={"example": ["BUYER", "SELLER"]})
+
+
+class BecomeSellerResponseSchema(ma.Schema):
+    """Response envelope for POST /users/become-seller."""
+    success = ma.fields.Bool(metadata={"example": True})
+    message = ma.fields.Str(metadata={"example": "You are a seller now"})
+    # data = ma.fields.Nested(BecomeSellerDataSchema)
 
 
 class UserUpdateFormSchema(UserSchema):
