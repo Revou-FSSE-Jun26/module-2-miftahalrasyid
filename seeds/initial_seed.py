@@ -16,6 +16,14 @@ SEED_PASSWORD = os.environ.get("SEED_PASSWORD", "changeme")
 def _seed_hash():
     return generate_password_hash(SEED_PASSWORD)
 
+# Deterministic base epoch for seeded payment refs (2026-08-01 00:00:00 UTC).
+# Real refs use int(time.time()); here we derive a stable per-order value so
+# re-seeding produces identical ORDER-{id}-{ts} strings.
+SEED_PAYMENT_TS = 1785542400
+
+def _pay_ref(order_id):
+    return f"ORDER-{order_id}-{SEED_PAYMENT_TS + order_id}"
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -402,38 +410,41 @@ def seed_database():
           # ORDERS (32 orders with realistic invoice names)
           # =====================================================================
           orders = [
-                    Order(id=1, user_id=8, name="inv-20260801-001", status=OrderStatus.COMPLETED, subtotal=21999000, total=21999000),
-                    Order(id=2, user_id=8, name="inv-20260802-002", status=OrderStatus.COMPLETED, subtotal=4999000, total=4999000),
-                    Order(id=3, user_id=9, name="inv-20260803-003", status=OrderStatus.PAID, subtotal=1899000, total=1899000),
+                    Order(id=1, user_id=8, name="inv-20260801-001", status=OrderStatus.COMPLETED, subtotal=21999000, total=21999000, payment_ref=_pay_ref(1), payment_status="settlement"),
+                    Order(id=2, user_id=8, name="inv-20260802-002", status=OrderStatus.COMPLETED, subtotal=4999000, total=4999000, payment_ref=_pay_ref(2), payment_status="settlement"),
+                    Order(id=3, user_id=9, name="inv-20260803-003", status=OrderStatus.PAID, subtotal=1899000, total=1899000, payment_ref=_pay_ref(3), payment_status="settlement"),
                     Order(id=4, user_id=9, name="inv-20260804-004", status=OrderStatus.PENDING, subtotal=299000, total=299000),
-                    Order(id=5, user_id=10, name="inv-20260805-005", status=OrderStatus.COMPLETED, subtotal=2899000, total=2899000),
-                    Order(id=6, user_id=10, name="inv-20260806-006", status=OrderStatus.PAID, subtotal=6499000, total=6499000),
-                    Order(id=7, user_id=11, name="inv-20260807-007", status=OrderStatus.COMPLETED, subtotal=1599000, total=1599000),
+                    Order(id=5, user_id=10, name="inv-20260805-005", status=OrderStatus.COMPLETED, subtotal=2899000, total=2899000, payment_ref=_pay_ref(5), payment_status="settlement"),
+                    Order(id=6, user_id=10, name="inv-20260806-006", status=OrderStatus.PAID, subtotal=6499000, total=6499000, payment_ref=_pay_ref(6), payment_status="settlement"),
+                    Order(id=7, user_id=11, name="inv-20260807-007", status=OrderStatus.COMPLETED, subtotal=1599000, total=1599000, payment_ref=_pay_ref(7), payment_status="settlement"),
                     Order(id=8, user_id=11, name="inv-20260808-008", status=OrderStatus.PENDING, subtotal=1199000, total=1199000),
-                    Order(id=9, user_id=12, name="inv-20260809-009", status=OrderStatus.COMPLETED, subtotal=3299000, total=3299000),
-                    Order(id=10, user_id=12, name="inv-20260810-010", status=OrderStatus.PAID, subtotal=899000, total=899000),
+                    Order(id=9, user_id=12, name="inv-20260809-009", status=OrderStatus.COMPLETED, subtotal=3299000, total=3299000, payment_ref=_pay_ref(9), payment_status="settlement"),
+                    Order(id=10, user_id=12, name="inv-20260810-010", status=OrderStatus.PAID, subtotal=899000, total=899000, payment_ref=_pay_ref(10), payment_status="settlement"),
                     Order(id=11, user_id=13, name="inv-20260811-011", status=OrderStatus.PENDING, subtotal=1499000, total=1499000),
-                    Order(id=12, user_id=13, name="inv-20260812-012", status=OrderStatus.COMPLETED, subtotal=189000, total=189000),
-                    Order(id=13, user_id=14, name="inv-20260813-013", status=OrderStatus.COMPLETED, subtotal=25999000, total=25999000),
-                    Order(id=14, user_id=14, name="inv-20260814-014", status=OrderStatus.PAID, subtotal=1499000, total=1499000),
-                    Order(id=15, user_id=15, name="inv-20260815-015", status=OrderStatus.COMPLETED, subtotal=3299000, total=3299000),
-                    Order(id=16, user_id=16, name="inv-20260816-016", status=OrderStatus.COMPLETED, subtotal=22999000, total=22999000),
-                    Order(id=17, user_id=16, name="inv-20260817-017", status=OrderStatus.PAID, subtotal=1599000, total=1599000),
-                    Order(id=18, user_id=17, name="inv-20260818-018", status=OrderStatus.COMPLETED, subtotal=2799000, total=2799000),
+                    Order(id=12, user_id=13, name="inv-20260812-012", status=OrderStatus.COMPLETED, subtotal=189000, total=189000, payment_ref=_pay_ref(12), payment_status="settlement"),
+                    Order(id=13, user_id=14, name="inv-20260813-013", status=OrderStatus.COMPLETED, subtotal=25999000, total=25999000, payment_ref=_pay_ref(13), payment_status="settlement"),
+                    Order(id=14, user_id=14, name="inv-20260814-014", status=OrderStatus.PAID, subtotal=1499000, total=1499000, payment_ref=_pay_ref(14), payment_status="settlement"),
+                    Order(id=15, user_id=15, name="inv-20260815-015", status=OrderStatus.COMPLETED, subtotal=3299000, total=3299000, payment_ref=_pay_ref(15), payment_status="settlement"),
+                    Order(id=16, user_id=16, name="inv-20260816-016", status=OrderStatus.COMPLETED, subtotal=22999000, total=22999000, payment_ref=_pay_ref(16), payment_status="settlement"),
+                    Order(id=17, user_id=16, name="inv-20260817-017", status=OrderStatus.PAID, subtotal=1599000, total=1599000, payment_ref=_pay_ref(17), payment_status="settlement"),
+                    Order(id=18, user_id=17, name="inv-20260818-018", status=OrderStatus.COMPLETED, subtotal=2799000, total=2799000, payment_ref=_pay_ref(18), payment_status="settlement"),
                     Order(id=19, user_id=17, name="inv-20260819-019", status=OrderStatus.PENDING, subtotal=169000, total=169000),
-                    Order(id=20, user_id=18, name="inv-20260820-020", status=OrderStatus.COMPLETED, subtotal=19999000, total=19999000),
-                    Order(id=21, user_id=19, name="inv-20260821-021", status=OrderStatus.PAID, subtotal=299000, total=299000),
-                    Order(id=22, user_id=20, name="inv-20260822-022", status=OrderStatus.COMPLETED, subtotal=899000, total=899000),
+                    Order(id=20, user_id=18, name="inv-20260820-020", status=OrderStatus.COMPLETED, subtotal=19999000, total=19999000, payment_ref=_pay_ref(20), payment_status="settlement"),
+                    Order(id=21, user_id=19, name="inv-20260821-021", status=OrderStatus.PAID, subtotal=299000, total=299000, payment_ref=_pay_ref(21), payment_status="settlement"),
+                    Order(id=22, user_id=20, name="inv-20260822-022", status=OrderStatus.COMPLETED, subtotal=899000, total=899000, payment_ref=_pay_ref(22), payment_status="settlement"),
                     Order(id=23, user_id=21, name="inv-20260823-023", status=OrderStatus.PENDING, subtotal=10999000, total=10999000),
-                    Order(id=24, user_id=22, name="inv-20260824-024", status=OrderStatus.COMPLETED, subtotal=1499000, total=1499000),
-                    Order(id=25, user_id=23, name="inv-20260825-025", status=OrderStatus.PAID, subtotal=12999000, total=12999000),
-                    Order(id=26, user_id=24, name="inv-20260826-026", status=OrderStatus.COMPLETED, subtotal=15999000, total=15999000),
+                    Order(id=24, user_id=22, name="inv-20260824-024", status=OrderStatus.COMPLETED, subtotal=1499000, total=1499000, payment_ref=_pay_ref(24), payment_status="settlement"),
+                    Order(id=25, user_id=23, name="inv-20260825-025", status=OrderStatus.PAID, subtotal=12999000, total=12999000, payment_ref=_pay_ref(25), payment_status="settlement"),
+                    Order(id=26, user_id=24, name="inv-20260826-026", status=OrderStatus.COMPLETED, subtotal=15999000, total=15999000, payment_ref=_pay_ref(26), payment_status="settlement"),
                     Order(id=27, user_id=25, name="inv-20260827-027", status=OrderStatus.PENDING, subtotal=1299000, total=1299000),
-                    Order(id=28, user_id=26, name="inv-20260828-028", status=OrderStatus.COMPLETED, subtotal=1699000, total=1699000),
-                    Order(id=29, user_id=27, name="inv-20260829-029", status=OrderStatus.PAID, subtotal=899000, total=899000),
-                    Order(id=30, user_id=28, name="inv-20260830-030", status=OrderStatus.COMPLETED, subtotal=1499000, total=1499000),
+                    Order(id=28, user_id=26, name="inv-20260828-028", status=OrderStatus.COMPLETED, subtotal=1699000, total=1699000, payment_ref=_pay_ref(28), payment_status="settlement"),
+                    Order(id=29, user_id=27, name="inv-20260829-029", status=OrderStatus.PAID, subtotal=899000, total=899000, payment_ref=_pay_ref(29), payment_status="settlement"),
+                    Order(id=30, user_id=28, name="inv-20260830-030", status=OrderStatus.COMPLETED, subtotal=1499000, total=1499000, payment_ref=_pay_ref(30), payment_status="settlement"),
                     Order(id=31, user_id=29, name="inv-20260831-031", status=OrderStatus.PENDING, subtotal=4999000, total=4999000),
                     Order(id=32, user_id=30, name="inv-20260831-032", status=OrderStatus.CANCELED, subtotal=24999000, total=24999000),
+                    # PENDING cart order for Mike (admin, user 2) so admin can test the payment flow.
+                    # Uses a seller-owned product (no self-purchase conflict). Mike's default address is id 31.
+                    Order(id=33, user_id=2, name="inv-20260831-033", status=OrderStatus.PENDING, subtotal=21999000, total=21999000),
                ]
           db.session.add_all(orders)
           db.session.flush()
@@ -479,6 +490,8 @@ def seed_database():
                     Order_item(id=33, order_id=1, product_id=5, quantity=1, compound_price=4999000),
                     Order_item(id=34, order_id=16, product_id=30, quantity=1, compound_price=1599000),
                     Order_item(id=35, order_id=20, product_id=5, quantity=2, compound_price=9998000),
+                    # Item for Mike's PENDING order (33): product 1 (iphone, owner=seller 3), qty 1.
+                    Order_item(id=36, order_id=33, product_id=1, quantity=1, compound_price=21999000),
                ]
           db.session.add_all(order_items_data)
           db.session.flush()

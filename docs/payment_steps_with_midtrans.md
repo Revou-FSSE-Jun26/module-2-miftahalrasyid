@@ -79,8 +79,41 @@ order not `PENDING` `400`, no default address `400`, insufficient stock `400`).
 
 Open `redirect_url` in a browser. This is Midtrans's hosted Snap page (their frontend,
 not ours). In **sandbox**, pay with Midtrans's published test credentials — for example
-a test card such as `4811 1111 1111 1114`, any future expiry, CVV `123`, OTP `112233`.
-(Always use the current values from the Midtrans sandbox docs.)
+a test card such as `4811 1111 1111 1114`, any future expiry, CVV `123`, OTP `112233`
+(full list below).
+
+#### Sandbox test cards
+
+Random card numbers are rejected by the sandbox — use Midtrans's published test
+cards. For every card below: use **any future expiry** (e.g. `12/30`), **CVV `123`**,
+and 3DS/OTP password **`112233`** when prompted. Values can change, so cross-check the
+[Midtrans sandbox testing docs](https://docs.midtrans.com/docs/testing-payment-on-sandbox).
+
+| Scenario | Card number | Resulting `transaction_status` | Order outcome |
+| :--- | :--- | :--- | :--- |
+| Success (Visa) | `4811 1111 1111 1114` | `capture` / `settlement` | `PENDING -> PAID`, stock deducted |
+| Success (Mastercard) | `5211 1111 1111 1117` | `capture` / `settlement` | `PENDING -> PAID`, stock deducted |
+| 3DS challenge (forces OTP) | `4411 1111 1111 1118` | `capture` after OTP `112233` | `PAID` once OTP passes |
+| Deny / declined | `4911 1111 1111 1113` | `deny` | stays `PENDING`, stock untouched |
+| Insufficient funds | `4111 1111 1111 1112` | `deny` | stays `PENDING`, stock untouched |
+
+Notes:
+
+- **Success** cards trigger the webhook path that flips the order to `PAID`
+  (see step 4). CVV `123`, OTP `112233` are the standard sandbox values.
+- **Deny** cards make Midtrans send `transaction_status = deny`; the webhook records
+  it and the order stays `PENDING` — nothing is deducted.
+- **Expire** is not a card: an order expires when it is left unpaid past the Snap
+  window, or you can force it from the
+  [transaction simulator](https://simulator.sandbox.midtrans.com/) (Card Payment ->
+  set status to `expire`). The webhook then records `payment_status = expire`, order
+  stays `PENDING`.
+- Non-card methods (bank transfer / e-wallet) are settled/expired/denied from that
+  same simulator rather than with a card number.
+- These only work with **sandbox** keys (`SB-Mid-...`). In production, real cards are
+  used and these numbers are invalid.
+
+Content was rephrased for compliance with licensing restrictions.
 
 In a real product, your web/mobile frontend would either redirect the user to
 `redirect_url` or embed Snap.js using `snap_token`.

@@ -517,12 +517,14 @@ flowchart TD
 │   │   ├── payment_schema.py
 │   │   ├── product_schema.py
 │   │   ├── profile_schema.py
+│   │   ├── query_schema.py
 │   │   └── user_schema.py
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── address_service.py
 │   │   ├── auth_service.py
 │   │   ├── category_service.py
+│   │   ├── midtrans_client.py
 │   │   ├── order_service.py
 │   │   ├── payment_service.py
 │   │   ├── product_service.py
@@ -531,9 +533,12 @@ flowchart TD
 │   │   └── user_service.py
 │   └── utils/
 │       ├── __init__.py
+│       ├── logger.py
 │       ├── pagination.py
 │       └── sanitizer.py
+├── audit.sh*
 ├── docs/
+│   ├── payment_steps_with_midtrans.md
 │   ├── queries.sql
 │   ├── requirements.md
 │   ├── schema.sql
@@ -545,31 +550,43 @@ flowchart TD
 │   │   ├── postman-post.png
 │   │   └── postman-put.png
 │   └── seed.sql
+├── folder_tree.sh*
+├── instance/
+│   ├── t.db
+│   ├── temp.db
+│   └── temp_check.db
+├── locust_bash.sh
 ├── locustfile.py
 ├── migrations/
 │   ├── README
+│   ├── _archive_versions/
+│   │   ├── 0268dfcb6edb_add_profiles_and_addresses_tables_.py
+│   │   ├── 06c257caa915_add_uuid_column_to_products.py
+│   │   ├── 1a42d12c6f44_rename_products_quantity_column_to_.py
+│   │   ├── 29d20ad1e7a2_add_slug_images_updated_at_to_products.py
+│   │   ├── 37490e1a0463_add_username_and_role_enum_to_users.py
+│   │   ├── 3ce39395ca90_alter_orders_layout_and_data_types.py
+│   │   ├── 503a9a24193e_add_deleted_at_and_change_all_to_server_.py
+│   │   ├── 7633e2e310ef_convert_order_items_from_junction_table_.py
+│   │   ├── 815a83d2ddfb_add_deleted_at_to_orders.py
+│   │   ├── 9a575b777f47_change_provider_column_from_string_to_.py
+│   │   ├── 9f84e4623f17_add_pricing_fields_to_orders.py
+│   │   ├── bf1bb0ac101e_add_is_active_and_sku_to_products.py
+│   │   ├── c00af829578d_fix_junction_mapping_to_string.py
+│   │   ├── c7f2cbb27adc_change_role_to_roles_user_table.py
+│   │   ├── d95589515a54_add_deleted_at_to_categories_and_server_.py
+│   │   ├── e5dadb8947a1_convert_order_items_to_pure_many_to_.py
+│   │   ├── e6f0237835c7_update_orderstatus_enum_values.py
+│   │   └── fb1b2de14c14_add_deleted_at_on_user.py
 │   ├── alembic.ini
 │   ├── env.py
 │   ├── script.py.mako
 │   └── versions/
-│       ├── 0268dfcb6edb_add_profiles_and_addresses_tables_.py
-│       ├── 06c257caa915_add_uuid_column_to_products.py
-│       ├── 1a42d12c6f44_rename_products_quantity_column_to_.py
-│       ├── 29d20ad1e7a2_add_slug_images_updated_at_to_products.py
-│       ├── 37490e1a0463_add_username_and_role_enum_to_users.py
-│       ├── 3ce39395ca90_alter_orders_layout_and_data_types.py
-│       ├── 503a9a24193e_add_deleted_at_and_change_all_to_server_.py
-│       ├── 7633e2e310ef_convert_order_items_from_junction_table_.py
-│       ├── 815a83d2ddfb_add_deleted_at_to_orders.py
-│       ├── 9a575b777f47_change_provider_column_from_string_to_.py
-│       ├── 9f84e4623f17_add_pricing_fields_to_orders.py
-│       ├── bf1bb0ac101e_add_is_active_and_sku_to_products.py
-│       ├── c00af829578d_fix_junction_mapping_to_string.py
-│       ├── c7f2cbb27adc_change_role_to_roles_user_table.py
-│       ├── d95589515a54_add_deleted_at_to_categories_and_server_.py
-│       ├── e5dadb8947a1_convert_order_items_to_pure_many_to_.py
-│       ├── e6f0237835c7_update_orderstatus_enum_values.py
-│       └── fb1b2de14c14_add_deleted_at_on_user.py
+│       ├── 938979f6db37_baseline_schema.py
+│       └── c4376e96a7c7_add_payment_ref_and_payment_status_to_.py
+├── ngrok_tunnel.sh*
+├── readme_japanese.md
+├── requirements-dev.txt
 ├── requirements.txt
 ├── run.py
 ├── seeds/
