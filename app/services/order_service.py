@@ -222,10 +222,12 @@ def create_order(order_instance, items_data, jwt_user_id, roles):
         if "uq_order_product" in error_msg:
             return ValidationResponse(success=False, message="Product already exists in this order")
         logging.error(f"Integrity error creating order: {error_msg}")
+        logging.debug(f"Integrity error creating order (full detail): {error_msg}", exc_info=True)
         return None
     except Exception as e:
         db.session.rollback()
         logging.error(f"Failed to create order: {str(e)}")
+        logging.debug(f"Failed to create order (full detail): {str(e)}", exc_info=True)
         return None
 
 

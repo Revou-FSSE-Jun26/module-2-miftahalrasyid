@@ -30,6 +30,14 @@ class OrderSchema(SanitizeMixin, SQLAlchemyAutoSchema):
         sqla_session = db.session
         include_fk = True
         include_relationships = False
+        # These columns are set by the server (pricing is computed in the service;
+        # address/payment fields are assigned during the payment flow). Excluding
+        # them keeps the create-order request body to just name + items, so the
+        # Swagger example is a valid request.
+        exclude = (
+            "address_id", "subtotal", "discount_percent", "discount_amount",
+            "tax_percent", "tax_amount", "payment_ref", "payment_status",
+        )
 
     # --- Input Validation ---
     name = ma.fields.Str(
@@ -39,12 +47,14 @@ class OrderSchema(SanitizeMixin, SQLAlchemyAutoSchema):
     )
 
     # --- Items: list of {product_id, quantity} for creating an order ---
+    # Example uses seeded products (id 1 = iphone_15_pro_max, id 8 = nike_air_max_90),
+    # both owned by sellers, so any buyer can order them.
     items = ma.fields.List(
         ma.fields.Nested(OrderItemInputSchema),
         required=True,
         load_only=True,
         error_messages={"required": "Order items are required."},
-        metadata={"example": [{"product_id": 1, "quantity": 2}, {"product_id": 3, "quantity": 1}]}
+        metadata={"example": [{"product_id": 1, "quantity": 2}, {"product_id": 8, "quantity": 1}]}
     )
 
     # --- dump_only: server-generated ---
