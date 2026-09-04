@@ -47,6 +47,54 @@ class UserSchema(SanitizeMixin, SQLAlchemyAutoSchema):
         """
         Strip whitespace from all string inputs before validation.
         """
+class UserCreateSchema(SanitizeMixin, SQLAlchemyAutoSchema):
+    """
+    Input-only schema for POST /users. Declaring the writable fields explicitly
+    (and excluding the server-generated columns) keeps the Swagger request body
+    clean — no id/provider/created_at/deleted_at in the example.
+    """
+    class Meta:
+        model = User
+        load_instance = True
+        sqla_session = db.session
+        include_fk = True
+        # Server-generated / server-controlled columns must never be client input.
+        exclude = ("id", "username", "provider", "provider_key", "created_at", "deleted_at")
+
+    email = ma.fields.Email(
+        required=True,
+        error_messages={
+            "required": "Email is not provided.",
+            "invalid": "Email format is wrong."
+        }
+    )
+    age = ma.fields.Int(
+        required=True,
+        error_messages={
+            "required": "Age is not provided.",
+            "invalid": "'age' must be a valid number."
+        }
+    )
+    password = ma.fields.Str(
+        required=True,
+        load_only=True,
+        error_messages={"required": "Password is not provided."},
+        validate=ma.validate.Length(min=1, error="Password cannot be an empty string.")
+    )
+    roles = ma.fields.List(
+        ma.fields.Str(validate=ma.validate.OneOf(["BUYER", "SELLER", "ADMIN", "SUPERADMIN"])),
+        required=False,
+        load_default=["BUYER"],
+        metadata={"example": ["ADMIN"]}
+    )
+    is_active = ma.fields.Bool(
+        required=False,
+        load_default=False,
+        metadata={"example": True}
+    )
+
+    @ma.pre_load
+    def strip_input_strings(self, data, **kwargs):
         if isinstance(data, dict):
             for field in ('email', 'password'):
                 if field in data and isinstance(data[field], str):

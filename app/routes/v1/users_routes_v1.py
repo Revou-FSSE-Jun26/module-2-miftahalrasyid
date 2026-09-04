@@ -4,7 +4,7 @@ from flask_smorest import Blueprint, abort
 from flask_jwt_extended import get_jwt_identity, get_jwt
 from app.services.auth_service import roles_required
 from app.models import UserRole
-from app.schemas import UserSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples, DeleteActionSchema, ProfileUpdateSchema, UserQueryArgs
+from app.schemas import UserSchema, UserCreateSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, UserErrorExamples, DeleteActionSchema, ProfileUpdateSchema, UserQueryArgs
 from app.permissions.field_filter import get_delete_policy
 from app.services.user_service import (
     get_all_users,
@@ -51,7 +51,7 @@ class UsersRoot(MethodView):
         }), 200
 
     @users_bp.doc(responses=UserErrorExamples.RESPONSES_POST_USER, security=[{"BearerAuth": []}])
-    @users_bp.arguments(UserSchema, location="json")
+    @users_bp.arguments(UserCreateSchema, location="json")
     @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @users_bp.response(201, UserSchema)
     def post(self, user_instance):
