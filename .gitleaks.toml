@@ -19,4 +19,9 @@ paths = [
   '''\.env\.example$''',
   '''seeds/.*''',
   '''README\.md$''',
+  # Docs: example snap_token and a legacy DB dump of seed test-user password
+  # hashes (not real secrets). docs/seed.sql is now gitignored; allowlisted so
+  # history scans don't fail on it.
+  '''docs/seed\.sql$''',
+  '''docs/payment_steps_with_midtrans\.md$''',
 ]

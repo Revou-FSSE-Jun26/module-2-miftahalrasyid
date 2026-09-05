@@ -47,3 +47,6 @@ readme_japanese.md
 
 # === Runtime logs ===
 logs/
+
+# === DB dump (redundant — use seeds/initial_seed.py instead) ===
+docs/seed.sql
