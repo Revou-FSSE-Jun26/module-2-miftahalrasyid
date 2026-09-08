@@ -79,11 +79,22 @@ class OAuthGoogleSchema(SanitizeMixin, ma.Schema):
 class TokenResponseSchema(ma.Schema):
     """Response schema for successful authentication"""
     access_token = ma.fields.Str(required=True, metadata={"example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."})
+    refresh_token = ma.fields.Str(required=False, metadata={"example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...", "description": "Present on login/OAuth (7-day expiry); absent on register."})
     user_id = ma.fields.Int(required=True, metadata={"example": 1})
     email = ma.fields.Str(required=True, metadata={"example": "rafaelalun@gmail.com"})
     username = ma.fields.Str(required=True, metadata={"example": "rafaelalun"})
     is_active = ma.fields.Bool(required=True, metadata={"example": False})
     message = ma.fields.Str(required=True, metadata={"example": "Registration successful. Please verify your email."})
+
+
+class RefreshResponseSchema(ma.Schema):
+    """Response schema for POST /auth/refresh (new access token)"""
+    access_token = ma.fields.Str(required=True, metadata={"example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."})
+    user_id = ma.fields.Int(required=True, metadata={"example": 1})
+    email = ma.fields.Str(required=True, metadata={"example": "rafaelalun@gmail.com"})
+    username = ma.fields.Str(required=True, metadata={"example": "rafaelalun"})
+    is_active = ma.fields.Bool(required=True, metadata={"example": True})
+    message = ma.fields.Str(required=True, metadata={"example": "Token refreshed successfully."})
 
 
 class EmailConfirmationResponseSchema(ma.Schema):

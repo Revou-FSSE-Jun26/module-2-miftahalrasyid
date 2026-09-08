@@ -7,8 +7,10 @@ from email.mime.multipart import MIMEMultipart
 from dataclasses import dataclass
 from functools import wraps
 
+from datetime import timedelta
+
 from flask import current_app, jsonify
-from flask_jwt_extended import create_access_token, verify_jwt_in_request, get_jwt
+from flask_jwt_extended import create_access_token, create_refresh_token, verify_jwt_in_request, get_jwt
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 from sqlalchemy.exc import IntegrityError
@@ -44,6 +46,40 @@ def generate_token(user):
         additional_claims = additional_claims
     )
     return access_token
+
+
+def generate_refresh_token(user):
+    """Generate a JWT refresh token (7-day expiry) used to mint new access tokens."""
+    refresh_token = create_refresh_token(
+        identity      = str(user.id),
+        expires_delta = timedelta(days=7)
+    )
+    return refresh_token
+
+
+def refresh_access_token(user_id):
+    """
+    Issue a new access token for the identity carried by a valid refresh token.
+    Returns dict on success or ValidationResponse on failure.
+    """
+    user = User.query.get(int(user_id))
+    if user is None:
+        return ValidationResponse(success=False, message="User not found.")
+
+    if user.deleted_at is not None:
+        return ValidationResponse(success=False, message="This account has been deactivated.")
+
+    if not user.is_active:
+        return ValidationResponse(success=False, message="Account is not active.")
+
+    return {
+        "access_token": generate_token(user),
+        "user_id"     : user.id,
+        "email"       : user.email,
+        "username"    : user.username,
+        "is_active"   : user.is_active,
+        "message"     : "Token refreshed successfully."
+    }
 
 
 # =============================================================================
@@ -160,13 +196,15 @@ def login_user(email, password):
 
     # Generate JWT
     access_token = generate_token(user)
+    refresh_token = generate_refresh_token(user)
     return {
-        "access_token": access_token,
-        "user_id"     : user.id,
-        "email"       : user.email,
-        "username"    : user.username,
-        "is_active"   : user.is_active,
-        "message"     : "Login successful."
+        "access_token" : access_token,
+        "refresh_token": refresh_token,
+        "user_id"      : user.id,
+        "email"        : user.email,
+        "username"     : user.username,
+        "is_active"    : user.is_active,
+        "message"      : "Login successful."
     }
 
 
@@ -211,8 +249,10 @@ def oauth_google_login(token, age):
 
         # Login existing OAuth user
         access_token = generate_token(user)
+        refresh_token = generate_refresh_token(user)
         return {
             "access_token": access_token,
+            "refresh_token": refresh_token,
             "user_id": user.id,
             "email": user.email,
             "username": user.username,
@@ -242,9 +282,11 @@ def oauth_google_login(token, age):
         create_profile(new_user.id)
 
         access_token = generate_token(new_user)
+        refresh_token = generate_refresh_token(new_user)
 
         return {
             "access_token": access_token,
+            "refresh_token": refresh_token,
             "user_id": new_user.id,
             "email": new_user.email,
             "username": new_user.username,

@@ -1,12 +1,14 @@
 from flask.views import MethodView
 from flask import request
 from flask_smorest import Blueprint, abort
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.schemas import (
     RegisterSchema,
     LoginSchema,
     OAuthGoogleSchema,
     ResendVerificationSchema,
     TokenResponseSchema,
+    RefreshResponseSchema,
     EmailConfirmationResponseSchema,
     ResendVerificationResponseSchema,
     AuthErrorExamples,
@@ -17,6 +19,7 @@ from app.services.auth_service import (
     oauth_google_login,
     confirm_email,
     resend_verification_email,
+    refresh_access_token,
 )
 from app.services.user_service import ValidationResponse
 
@@ -145,6 +148,52 @@ class AuthLogin(MethodView):
 
         if isinstance(result, ValidationResponse):
             abort(400, message=result.message)
+        return result
+
+
+@auth_bp.route('/refresh')
+class AuthRefresh(MethodView):
+
+    @auth_bp.doc(
+        security=[{"bearerAuth": []}],
+        responses={
+            "401": {
+                "description": "Refresh Token Missing / Invalid / Expired",
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "TokenMissing": AuthErrorExamples.TOKEN_MISSING,
+                            "TokenExpired": AuthErrorExamples.TOKEN_EXPIRED,
+                            "TokenInvalid": AuthErrorExamples.TOKEN_INVALID,
+                        }
+                    }
+                }
+            },
+            "400": {
+                "description": "Business Logic Failures",
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "AccountDeactivated": AuthErrorExamples.ACCOUNT_DEACTIVATED,
+                        }
+                    }
+                }
+            }
+        }
+    )
+    @jwt_required(refresh=True)
+    @auth_bp.response(200, RefreshResponseSchema)
+    def post(self):
+        """
+        Exchange a valid refresh token for a new access token.
+        Send the refresh token in the Authorization header: `Bearer <refresh_token>`.
+        """
+        user_id = get_jwt_identity()
+        result = refresh_access_token(user_id)
+
+        if isinstance(result, ValidationResponse):
+            abort(400, message=result.message)
+
         return result
 
 
