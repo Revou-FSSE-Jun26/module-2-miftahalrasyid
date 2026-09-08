@@ -2,7 +2,7 @@ from app.extensions import db
 import logging
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
-from app.models import Order, OrderStatus, Product, UserRole
+from app.models import Order, OrderStatus, Product, ProductStatus, UserRole
 from app.models.order_items_model import Order_item
 from . import ValidationResponse
 
@@ -153,15 +153,15 @@ def create_order(order_instance, items_data, jwt_user_id, roles):
                 return ValidationResponse(success=False, message="Duplicate product in order items")
             seen_product_ids.add(product_id)
 
-            # Verify product exists and is active
+            # Verify product exists and is purchasable (only ACTIVE products can be ordered)
             product = Product.query.filter(
                 Product.id == product_id,
                 Product.deleted_at.is_(None),
-                Product.is_active == True
+                Product.status == ProductStatus.ACTIVE
             ).first()
 
             if not product:
-                return ValidationResponse(success=False, message=f"Product with id '{product_id}' is not found or not available")
+                return ValidationResponse(success=False, message=f"Product with id '{product_id}' is currently unavailable")
 
             # Self-purchase prevention: seller cannot order their own products
             if product.user_id == int(jwt_user_id):
@@ -507,10 +507,21 @@ def get_order_items(order_id):
             Order_item.order_id == order_id,
             Order_item.deleted_at.is_(None)
         ).all()
+
+        # Resolve product names in one query. Deliberately NOT filtered by status
+        # or deleted_at: order history must show what was bought even if the
+        # product was later set INACTIVE/SUSPENDED/REJECTED or soft-deleted.
+        product_ids = [item.product_id for item in items]
+        name_by_id = {}
+        if product_ids:
+            for p in Product.query.filter(Product.id.in_(product_ids)).all():
+                name_by_id[p.id] = p.name
+
         return [
             {
                 "id": item.id,
                 "product_id": item.product_id,
+                "product_name": name_by_id.get(item.product_id),
                 "quantity": item.quantity,
                 "compound_price": float(item.compound_price),
                 "created_at": item.created_at.isoformat() if item.created_at else None,

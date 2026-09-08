@@ -2,7 +2,7 @@
 import os
 import io
 from unittest.mock import patch, MagicMock
-from app.models import User, Product
+from app.models import User, Product, ProductStatus
 from app.models.user_model import UserRole, AuthProvider
 from app.extensions import db
 from werkzeug.security import generate_password_hash
@@ -76,7 +76,7 @@ class TestUploadImage:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='UplProd', slug='uplprod', uuid='upluuid1',
-            stock=10, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=10, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         file = FileStorage(stream=io.BytesIO(b'imgdata'), filename='test.png')
@@ -91,7 +91,7 @@ class TestUploadImage:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='UplOk', slug='uplok', uuid='uplokuuid',
-            stock=10, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=10, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         file = FileStorage(stream=io.BytesIO(b'\x89PNG\r\n\x1a\n' + b'\x00' * 100), filename='photo.png')
@@ -113,7 +113,7 @@ class TestUploadImage:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='UplMax', slug='uplmax', uuid='uplmaxuuid',
-            stock=10, brand='B', description='D', price=Decimal('100'), is_active=True,
+            stock=10, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE,
             images=['img1.png', 'img2.png', 'img3.png', 'img4.png'])
         db_session.add(prod)
         db_session.commit()
@@ -148,7 +148,7 @@ class TestDeleteImage:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='DelProd', slug='delprod-upl', uuid='deluuid1',
-            stock=10, brand='B', description='D', price=Decimal('100'), is_active=True,
+            stock=10, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE,
             images=['products/deluuid1/test.png'])
         db_session.add(prod)
         db_session.commit()
@@ -163,7 +163,7 @@ class TestDeleteImage:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='NoImg', slug='noimg', uuid='noimguuid',
-            stock=10, brand='B', description='D', price=Decimal('100'), is_active=True,
+            stock=10, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE,
             images=[])
         db_session.add(prod)
         db_session.commit()
@@ -178,7 +178,7 @@ class TestDeleteImage:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='DelOk', slug='delok', uuid='delokuuid',
-            stock=10, brand='B', description='D', price=Decimal('100'), is_active=True,
+            stock=10, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE,
             images=['products/delokuuid/delok_photo.png'])
         db_session.add(prod)
         db_session.commit()

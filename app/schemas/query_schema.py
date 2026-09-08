@@ -137,9 +137,10 @@ class AdminProductQueryArgs(ProductQueryArgs):
     Filtering for admin product listings (GET /admin/products,
     GET /admin/categories/<id>/products) which include inactive/soft-deleted.
     """
-    is_active = ma.fields.Bool(
-        load_default=None,
-        metadata={"description": "Filter by active flag.", "example": False},
+    status = ma.fields.Str(
+        load_default=ma.missing,
+        validate=ma.validate.OneOf(["PENDING", "ACTIVE", "INACTIVE", "SUSPENDED", "REJECTED"]),
+        metadata={"description": "Filter by product status.", "example": "PENDING"},
     )
     include_deleted = ma.fields.Bool(
         load_default=True,

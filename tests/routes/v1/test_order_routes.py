@@ -57,7 +57,7 @@ class TestDeleteOrder:
 # =============================================================================
 # INTEGRATION TESTS — Real DB operations (no mocks)
 # =============================================================================
-from app.models import User, Product, Order, Category
+from app.models import User, Product, ProductStatus, Order, Category
 from app.models.user_model import UserRole, AuthProvider
 from app.models.order_model import OrderStatus
 from app.models.order_items_model import Order_item
@@ -77,7 +77,7 @@ class TestOrderIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='OrdProd', slug='ordprod', uuid='orduuid1',
-            stock=20, brand='B', description='D', price=Decimal('500'), is_active=True)
+            stock=20, brand='B', description='D', price=Decimal('500'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         buyer = User(username='ordbuyer', email='ordbuyer@test.com', age=25, is_active=True,
@@ -102,7 +102,7 @@ class TestOrderIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='LowStock', slug='lowstock', uuid='lowuuid',
-            stock=1, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=1, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         buyer = User(username='ordbuyer2', email='ordbuyer2@test.com', age=25, is_active=True,
@@ -143,7 +143,7 @@ class TestOrderIntegrationCRUD:
             'name': 'ghost order', 'items': [{'product_id': 99999, 'quantity': 1}]
         })
         assert resp.status_code == 400
-        assert 'not found' in resp.get_json()['message']
+        assert 'unavailable' in resp.get_json()['message']
 
     def test_get_order_by_id(self, app, db_session, client):
         buyer = User(username='orddetail', email='orddetail@test.com', age=25, is_active=True,
@@ -200,7 +200,7 @@ class TestOrderIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='UpdProd', slug='updprod-ord', uuid='upduuid2',
-            stock=20, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=20, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         buyer = User(username='ordselbuyer', email='ordselbuyer@test.com', age=25, is_active=True,
@@ -229,7 +229,7 @@ class TestOrderIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='CancelProd', slug='cancelprod', uuid='canceluuid',
-            stock=20, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=20, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         buyer = User(username='ordcancbuyer', email='ordcancbuyer@test.com', age=25, is_active=True,
@@ -260,7 +260,7 @@ class TestOrderIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='HardDelProd', slug='harddelprod-ord', uuid='hdorduuid',
-            stock=20, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=20, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         buyer = User(username='ordhardbuyer', email='ordhardbuyer@test.com', age=25, is_active=True,
@@ -293,7 +293,7 @@ class TestOrderIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='OrdProdGet', slug='ordprodget', uuid='opgtuuid',
-            stock=20, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=20, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         buyer = User(username='ordprodbuyer', email='ordprodbuyer@test.com', age=25, is_active=True,
@@ -324,7 +324,7 @@ class TestOrderIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='DupProd', slug='dupprod-ord', uuid='dupuuid2',
-            stock=20, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=20, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         buyer = User(username='orddupbuyer', email='orddupbuyer@test.com', age=25, is_active=True,

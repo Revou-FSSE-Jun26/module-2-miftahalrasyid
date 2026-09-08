@@ -56,7 +56,7 @@ class TestAdminUserProfile:
 
 
 # --- Integration tests using test DB ---
-from app.models import User, Product, Order, Category, Profile, Address
+from app.models import User, Product, ProductStatus, Order, Category, Profile, Address
 from app.models.user_model import UserRole, AuthProvider
 from app.models.order_model import OrderStatus
 from app.models.order_items_model import Order_item
@@ -74,9 +74,9 @@ class TestAdminProductsIntegration:
         db_session.add(seller)
         db_session.commit()
         p1 = Product(user_id=seller.id, name='active prod', slug='active-prod-adm', uuid='uadm1',
-            stock=10, brand='b', description='d', price=Decimal('100'), is_active=True)
+            stock=10, brand='b', description='d', price=Decimal('100'), status=ProductStatus.ACTIVE)
         p2 = Product(user_id=seller.id, name='deleted prod', slug='deleted-prod-adm', uuid='uadm2',
-            stock=5, brand='b', description='d', price=Decimal('50'), is_active=False)
+            stock=5, brand='b', description='d', price=Decimal('50'), status=ProductStatus.INACTIVE)
         db_session.add_all([p1, p2])
         db_session.commit()
         admin = User(username='admuser', email='admuser@test.com', age=35, is_active=True,

@@ -83,7 +83,7 @@ class TestDeleteProduct:
 # =============================================================================
 # INTEGRATION TESTS — Real DB operations (no mocks)
 # =============================================================================
-from app.models import User, Product, Order, Category
+from app.models import User, Product, ProductStatus, Order, Category
 from app.models.user_model import UserRole, AuthProvider
 from app.models.order_model import OrderStatus
 from app.models.order_items_model import Order_item
@@ -124,7 +124,7 @@ class TestProductIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='GetProd', slug='getprod', uuid='getprod-uuid',
-            stock=5, brand='B', description='D', price=Decimal('200'), is_active=True)
+            stock=5, brand='B', description='D', price=Decimal('200'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         resp = client.get(f'/api/v1/products/{prod.id}')
@@ -142,9 +142,9 @@ class TestProductIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         p1 = Product(user_id=seller.id, name='Prod1', slug='prod1-int', uuid='p1uuid',
-            stock=10, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=10, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         p2 = Product(user_id=seller.id, name='Prod2', slug='prod2-int', uuid='p2uuid',
-            stock=5, brand='B', description='D', price=Decimal('200'), is_active=True)
+            stock=5, brand='B', description='D', price=Decimal('200'), status=ProductStatus.ACTIVE)
         db_session.add_all([p1, p2])
         db_session.commit()
         resp = client.get('/api/v1/products/')
@@ -158,7 +158,7 @@ class TestProductIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='OldName', slug='oldname-upd', uuid='upduuid',
-            stock=10, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=10, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         token = create_access_token(identity=str(seller.id), additional_claims={'roles': ['SELLER']})
@@ -176,7 +176,7 @@ class TestProductIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='DelProd', slug='delprod-int', uuid='deluuid',
-            stock=10, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=10, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         token = create_access_token(identity=str(seller.id), additional_claims={'roles': ['SELLER']})
@@ -191,7 +191,7 @@ class TestProductIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='HardDel', slug='harddel-int', uuid='harduuid',
-            stock=10, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=10, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         sa = User(username='prodsa2', email='prodsa2@test.com', age=35, is_active=True,
@@ -211,7 +211,7 @@ class TestProductIntegrationCRUD:
         db_session.add(seller)
         db_session.commit()
         prod = Product(user_id=seller.id, name='LinkedProd', slug='linkedprod', uuid='linkuuid',
-            stock=10, brand='B', description='D', price=Decimal('100'), is_active=True)
+            stock=10, brand='B', description='D', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(prod)
         db_session.commit()
         buyer = User(username='prodbuyer', email='prodbuyer@test.com', age=25, is_active=True,

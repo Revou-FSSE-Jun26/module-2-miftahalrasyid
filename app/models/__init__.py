@@ -1,5 +1,5 @@
 from app.models.user_model import User, UserRole, AuthProvider,UserRole
-from app.models.product_model import Product
+from app.models.product_model import Product, ProductStatus
 from app.models.order_model import Order, OrderStatus
 from app.models.order_items_model import Order_item
 from app.models.category_model import Category
@@ -12,6 +12,7 @@ __all__ = [
     'UserRole', 
     'AuthProvider', 
     'Product', 
+    'ProductStatus', 
     'Order', 
     'Category', 
     'category_items', 

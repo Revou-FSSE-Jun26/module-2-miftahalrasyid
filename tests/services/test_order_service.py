@@ -50,7 +50,7 @@ class TestValidateStatusTransition:
             from app.models.order_model import OrderStatus
             assert _validate_status_transition(OrderStatus.CANCELED, OrderStatus.COMPLETED) is False
 
-from app.models import User, Product, Order, Category
+from app.models import User, Product, ProductStatus, Order, Category
 from app.models.user_model import UserRole, AuthProvider
 from app.models.order_model import OrderStatus
 from app.models.order_items_model import Order_item
@@ -69,7 +69,7 @@ class TestCreateOrder:
             db_session.add(seller)
             db_session.commit()
             product = Product(user_id=seller.id, name='test prod', slug='test-prod-1', uuid='uuid1',
-                stock=10, brand='brand', description='desc', price=Decimal('100'), is_active=True)
+                stock=10, brand='brand', description='desc', price=Decimal('100'), status=ProductStatus.ACTIVE)
             db_session.add(product)
             db_session.commit()
             # Create buyer (separate from seller to avoid self-purchase block)
@@ -95,7 +95,7 @@ class TestCreateOrder:
             db_session.add(seller)
             db_session.commit()
             product = Product(user_id=seller.id, name='low stock', slug='low-stock-1', uuid='uuid2',
-                stock=1, brand='brand', description='desc', price=Decimal('50'), is_active=True)
+                stock=1, brand='brand', description='desc', price=Decimal('50'), status=ProductStatus.ACTIVE)
             db_session.add(product)
             db_session.commit()
             buyer = User(username='buyer2', email='buyer_test2@test.com', age=25, is_active=True,

@@ -7,7 +7,7 @@ from werkzeug.security import generate_password_hash
 from flask_jwt_extended import create_access_token
 
 from app.models.user_model import User, UserRole, AuthProvider
-from app.models.product_model import Product
+from app.models.product_model import Product, ProductStatus
 from app.models.order_model import Order, OrderStatus
 from app.models.order_items_model import Order_item
 from app.models.address_model import Address
@@ -59,7 +59,7 @@ class _Base:
     def _product(self, db_session, seller, stock=10, price='100'):
         n = self._next_id()
         p = Product(user_id=seller.id, name=f'PProd{n}', slug=f'pprod{n}', uuid=f'puuid{n}',
-                    stock=stock, brand='B', description='D', price=Decimal(price), is_active=True)
+                    stock=stock, brand='B', description='D', price=Decimal(price), status=ProductStatus.ACTIVE)
         db_session.add(p); db_session.commit()
         return p
 

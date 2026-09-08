@@ -56,6 +56,8 @@ class ProductSchema(SanitizeMixin, SQLAlchemyAutoSchema):
     images = ma.fields.List( ma.fields.Str(), dump_only=True)
     slug = ma.fields.Str(dump_only=True)
     updated_at = ma.fields.DateTime(dump_only=True)
+    # status is server-controlled on create (always PENDING); never accepted from the client here.
+    status = ma.fields.Str(dump_only=True)
     
     # Category IDs: Optional list of category IDs to link to the product.
     # This field is NOT on the model — we intercept it in pre_load so it never
@@ -68,11 +70,6 @@ class ProductSchema(SanitizeMixin, SQLAlchemyAutoSchema):
         load_only    = True,
         metadata     = {"example": [1, 2]}
     )
-    is_active  = ma.fields.Bool(
-        required     = False,
-        load_default = True
-    )
-
     user_id    = ma.fields.Int(
         load_only    = True,
         required     = False,
@@ -99,6 +96,9 @@ class ProductSchema(SanitizeMixin, SQLAlchemyAutoSchema):
                 data[field] = data[field].strip()
         data.pop('category_ids', [])
         data.pop('slug', None)
+        # status is never client-settable on create (always PENDING); drop it so
+        # it can't reach the Product() constructor.
+        data.pop('status', None)
         return data
     
 class ProductUpdateSchema(SanitizeMixin, SQLAlchemyAutoSchema):
@@ -117,7 +117,15 @@ class ProductUpdateSchema(SanitizeMixin, SQLAlchemyAutoSchema):
     price       = ma.fields.Decimal(required=False, validate=ma.validate.Range(min=0))
     stock       = ma.fields.Int(required=False, validate=ma.validate.Range(min=0))
     sku         = ma.fields.Str(required=False, allow_none=True)
-    is_active   = ma.fields.Bool(required=False)
+    # Lifecycle status. Accepted as a string; the *legality* of the transition
+    # (based on caller role + ownership) is enforced in the service layer.
+    status      = ma.fields.Str(
+        required=False,
+        validate=ma.validate.OneOf(
+            ["PENDING", "ACTIVE", "INACTIVE", "SUSPENDED", "REJECTED"],
+            error="Invalid status. Must be one of: PENDING, ACTIVE, INACTIVE, SUSPENDED, REJECTED."
+        ),
+    )
     category_ids = ma.fields.List(
         ma.fields.Int(),
         required=False,

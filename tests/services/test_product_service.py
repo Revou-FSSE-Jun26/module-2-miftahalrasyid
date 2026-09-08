@@ -1,4 +1,4 @@
-from app.models import User, Product
+from app.models import User, Product, ProductStatus
 from app.models.user_model import UserRole, AuthProvider
 from app.extensions import db
 from werkzeug.security import generate_password_hash
@@ -34,7 +34,7 @@ class TestDeleteProduct:
             db_session.add(seller)
             db_session.commit()
             product = Product(user_id=seller.id, name='del_prod', slug='del-prod', uuid='uuid-del',
-                stock=5, brand='b', description='d', price=Decimal('10'), is_active=True)
+                stock=5, brand='b', description='d', price=Decimal('10'), status=ProductStatus.ACTIVE)
             db_session.add(product)
             db_session.commit()
             from app.services.product_service import delete_product
@@ -49,7 +49,7 @@ class TestDeleteProduct:
         db_session.add(seller)
         db_session.commit()
         product = Product(user_id=seller.id, name='soft_prod', slug='soft-prod', uuid='uuid-soft',
-            stock=5, brand='b', description='d', price=Decimal('10'), is_active=True)
+            stock=5, brand='b', description='d', price=Decimal('10'), status=ProductStatus.ACTIVE)
         db_session.add(product)
         db_session.commit()
         from app.services.product_service import delete_product
@@ -70,7 +70,7 @@ class TestDeleteProduct:
         db_session.add_all([seller, buyer])
         db_session.commit()
         product = Product(user_id=seller.id, name='paid_prod', slug='paid-prod', uuid='uuid-paid',
-            stock=5, brand='b', description='d', price=Decimal('100'), is_active=True)
+            stock=5, brand='b', description='d', price=Decimal('100'), status=ProductStatus.ACTIVE)
         db_session.add(product)
         db_session.commit()
         order = Order(user_id=buyer.id, name='paid order', status=OrderStatus.PAID,
@@ -95,7 +95,7 @@ class TestCreateNewProduct:
         db_session.add(seller)
         db_session.commit()
         product = Product(name='new_prod', brand='b', description='d',
-            price=Decimal('50'), stock=3, is_active=True)
+            price=Decimal('50'), stock=3, status=ProductStatus.ACTIVE)
         from app.services.product_service import create_new_product
         with app.test_request_context('/', json={}):
             result = create_new_product(str(seller.id), product, ['SELLER'])
@@ -111,7 +111,7 @@ class TestCreateNewProduct:
         db_session.add(seller)
         db_session.commit()
         product = Product(name='badcat_prod', brand='b', description='d',
-            price=Decimal('50'), stock=3, is_active=True)
+            price=Decimal('50'), stock=3, status=ProductStatus.ACTIVE)
         from app.services.product_service import create_new_product
         with app.test_request_context('/', json={'category_ids': [99999]}):
             result = create_new_product(str(seller.id), product, ['SELLER'])
@@ -127,7 +127,7 @@ class TestUpdateProduct:
         db_session.add(seller)
         db_session.commit()
         product = Product(user_id=seller.id, name='old_prod', slug='old-prod', uuid='uuid-upd',
-            stock=5, brand='b', description='d', price=Decimal('10'), is_active=True)
+            stock=5, brand='b', description='d', price=Decimal('10'), status=ProductStatus.ACTIVE)
         db_session.add(product)
         db_session.commit()
         from app.services.product_service import update_product
@@ -146,7 +146,7 @@ class TestUpdateProduct:
         db_session.add_all([owner, other])
         db_session.commit()
         product = Product(user_id=owner.id, name='owned', slug='owned-prod', uuid='uuid-owned',
-            stock=5, brand='b', description='d', price=Decimal('10'), is_active=True)
+            stock=5, brand='b', description='d', price=Decimal('10'), status=ProductStatus.ACTIVE)
         db_session.add(product)
         db_session.commit()
         from app.services.product_service import update_product

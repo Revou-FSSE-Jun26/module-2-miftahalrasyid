@@ -41,6 +41,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Can create products (own only, auto-assigned to their user_id)
 - Can update own products (name, stock, brand, description, price, sku, categories)
 - Can soft-delete own products when status IS NOT `PAID` in orders
+- Can switch own product status between `ACTIVE` and `INACTIVE` in either direction (`ACTIVE → INACTIVE` when out of stock / supply issues, `INACTIVE → ACTIVE` when restocked). Cannot set any other status (`PENDING`, `SUSPENDED`, `REJECTED` are admin-controlled) and cannot self-approve a `PENDING` product.
 - Can read orders that contain their products
 - Can update order status (only for orders containing their products)
 - Cannot transition order status back to `PENDING`
@@ -56,6 +57,9 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Can create, read, update, and soft-delete categories
 - When deleting categories, associated `category_items` junction records are also deleted (no orphan relations)
 - Can create, read, update, and soft-delete products (including on behalf of other users)
+- May review a `PENDING` product and either approve it (`PENDING → ACTIVE`) or reject it (`PENDING → REJECTED`). On rejection the product is also soft-deleted (`deleted_at` set) so it never appears in `GET /api/v1/products/`; rejection is terminal (no revival — the seller must submit a new product)
+- May suspend or reinstate an `ACTIVE` product in either direction (`ACTIVE → SUSPENDED` when facing an issue, `SUSPENDED → ACTIVE` to reinstate). Suspension is always allowed and takes effect immediately — it is NOT blocked by existing `PAID` orders
+- Setting a product to `INACTIVE` or `SUSPENDED` immediately stops all new orders and payments for it (the purchase gate only allows `ACTIVE` products), and soft-deletes that product's `order_items` from orders still in `PENDING` order-status (unpaid carts). Existing `PAID` orders are never touched — they are honored and resolved through the normal order lifecycle (`PAID → COMPLETED` or `PAID → CANCELED` with refund)
 - Can create, read, update, and soft-delete orders
 - Can create, read, update, and soft-delete users (including role and is_active management)
 - Can manage user roles EXCEPT `SUPERADMIN` — only a superadmin can grant the `SUPERADMIN` role (privilege-escalation guard, returns 403)
@@ -73,6 +77,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 
 ### Orders & Cart
 - Orders created with `PENDING` status (acts as cart — stock not deducted, address can be null)
+- Only products with status `ACTIVE` (and not soft-deleted) can be added to an order or paid for. Adding or paying for a non-`ACTIVE` product (e.g. `INACTIVE`, `SUSPENDED`, `PENDING`, `REJECTED`) returns 400 with a generic "unavailable" message
 - Payment endpoint (`/api/v1/payment`) processes the order:
   - Validates address: if no default address is set and none specified, returns `"default address is not set"`
   - On success: transitions status to `PAID`, deducts product stock, sets delivery address
@@ -86,12 +91,38 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 
 ### Products
 - CRUD with ownership enforcement (only owner or admin+ can update/delete)
-- Cannot be deleted (soft or hard) when linked to active orders with `PAID` status (returns 409)
+- Product has a `status` lifecycle (replaces the old `is_active` boolean): `PENDING` | `ACTIVE` | `INACTIVE` | `SUSPENDED` | `REJECTED`
+  - `PENDING`: newly created by a seller, awaiting admin review. Not publicly visible.
+  - `ACTIVE`: approved and publicly visible / listable.
+  - `INACTIVE`: temporarily hidden by the seller (out of stock / supply issue). Not publicly visible.
+  - `SUSPENDED`: hidden by an admin due to an issue. Not publicly visible.
+  - `REJECTED`: admin rejected the pending product; also soft-deleted. Terminal.
+- Status transition matrix (enforced server-side; invalid transitions return 400):
+  - SELLER (owner only): `ACTIVE → INACTIVE`, `INACTIVE → ACTIVE`
+  - ADMIN / SUPERADMIN: `PENDING → ACTIVE`, `PENDING → REJECTED`, `ACTIVE → SUSPENDED`, `SUSPENDED → ACTIVE`, `ACTIVE → INACTIVE`, `INACTIVE → ACTIVE`
+  - `REJECTED` is terminal for everyone (no revival)
+- New product is always created with status `PENDING` (client-supplied status on create is ignored)
+- Status changes go through the existing `PUT /api/v1/products/<id>` endpoint (the `status` field is validated against the matrix above based on caller role + ownership); there is no separate status endpoint
+- `status` is the single source of purchasability: only a product with `status = ACTIVE` (and `deleted_at IS NULL`) can be added to an order or paid for
+- Setting a product to `INACTIVE` or `SUSPENDED` is always allowed and takes effect immediately (never blocked by existing orders). Its two effects:
+  1. New sales stop instantly — the purchase gate rejects any attempt to add or pay for a non-`ACTIVE` product
+  2. Cart cleanup (per-item, cross-seller safe): only that product's own `order_items` are soft-deleted, and only in orders still in `PENDING` order-status (unpaid carts). Items belonging to other sellers/products in the same cart are left untouched, the order itself is NOT deleted, and the affected orders' totals (subtotal/discount/tax/total) are recomputed from their remaining live items. If a cart ends up with zero live items it is left in place (the buyer can delete it); it is never auto-deleted
+- Existing `PAID` orders are never modified when a product is suspended/deactivated: their `order_items` stay intact and the buyer can always view what they purchased (price is snapshotted on the `order_item`). `PAID` orders are resolved only through the normal order lifecycle (`PAID → COMPLETED` or `PAID → CANCELED` with refund + stock restore)
+- Rejecting a product (`PENDING → REJECTED`) sets both `status = REJECTED` and `deleted_at`. Hiding relies on `deleted_at` (the same filter used everywhere), so no query needs a special `status != REJECTED` clause
+- Deleting a product (soft or hard, via `DELETE /api/v1/products/<id>`) is still blocked when the product is linked to active orders with `PAID` status (returns 409). This `PAID` guard applies to deletion only — not to `INACTIVE`/`SUSPENDED` status changes
+- Visibility rules for reads:
+  - Unauthenticated users, and BUYER / SELLER who is not the owner: see a product only when `deleted_at IS NULL` AND `status = ACTIVE` (in both `GET /api/v1/products/` and `GET /api/v1/products/<id>`)
+  - The owner (seller), ADMIN, and SUPERADMIN: see the product regardless of status (any non-deleted status) in `GET /api/v1/products/` (their own rows) and `GET /api/v1/products/<id>`
+- Order detail (`GET /api/v1/orders/<id>` items) always shows the purchased product's name and the paid price, even if the product is later set to `INACTIVE`/`SUSPENDED`/`REJECTED` — order history is read from the `order_items` snapshot, not gated by the product's current status
 - Auto-generated slug from product name
 - Stock tracked with DB-level `CHECK (stock >= 0)` constraint
 - Category assignment via many-to-many relationship through `category_items` junction table
 - Product image upload support
 - Query params on `GET /api/v1/products/`: `search` (name, case-insensitive), `category_id`, `min_price`, `max_price`, `sort` (`price`/`name`/`created_at`, prefix `-` for descending), plus `page`/`per_page`
+
+### Orders
+- Cannot be deleted when order has `PAID` in status
+- Paid orders should be refunded when 
 
 ### Categories
 - Only ADMIN and SUPERADMIN can create/update/delete categories

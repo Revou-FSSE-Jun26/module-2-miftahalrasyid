@@ -3,7 +3,7 @@ import time
 import hashlib
 from flask import current_app
 from app.extensions import db
-from app.models import Order, OrderStatus, Product
+from app.models import Order, OrderStatus, Product, ProductStatus
 from app.models.order_items_model import Order_item
 from app.models.address_model import Address
 from app.models.user_model import User
@@ -82,13 +82,13 @@ def initiate_payment(order_id, jwt_user_id, address_id=None):
             product = Product.query.filter(
                 Product.id == item.product_id,
                 Product.deleted_at.is_(None),
-                Product.is_active == True
+                Product.status == ProductStatus.ACTIVE
             ).first()
 
             if not product:
                 return ValidationResponse(
                     success=False,
-                    message=f"Product with id '{item.product_id}' is no longer available",
+                    message=f"Product with id '{item.product_id}' is currently unavailable",
                     status_code=400
                 )
 

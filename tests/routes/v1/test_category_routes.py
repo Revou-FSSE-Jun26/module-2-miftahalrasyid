@@ -79,7 +79,7 @@ from decimal import Decimal
 
 
 # --- Integration tests (real test DB) ---
-from app.models import Category, Product, User
+from app.models import Category, Product, User, ProductStatus
 from app.models.user_model import UserRole, AuthProvider
 from app.extensions import db
 from werkzeug.security import generate_password_hash
@@ -166,7 +166,7 @@ class TestCategoryIntegrationCRUD:
         db_session.add(cat)
         db_session.commit()
         prod = Product(user_id=seller.id, name='catprod1', slug='catprod1', uuid='cpuuid1',
-            stock=10, brand='b', description='d', price=Decimal('100'), is_active=True)
+            stock=10, brand='b', description='d', price=Decimal('100'), status=ProductStatus.ACTIVE)
         prod.categories = [cat]
         db_session.add(prod)
         db_session.commit()

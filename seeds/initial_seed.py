@@ -5,6 +5,7 @@ from app import create_app
 from app.extensions import db
 from app.models import User, UserRole, AuthProvider, Product, Category, Order, Order_item
 from app.models.order_model import OrderStatus
+from app.models.product_model import ProductStatus
 from app.models.category_items_model import category_items
 from app.models.profile_model import Profile
 from app.models.address_model import Address
@@ -339,14 +340,32 @@ def seed_database():
                     {"id": 32, "name": "jbl_flip_6", "brand": "JBL", "description": "Portable Bluetooth speaker with IP67 waterproof, 12hr battery", "price": 1699000, "stock": 50, "sku": "JBL-FLIP6-BLK", "user_id": 3},
                ]
 
+          # A few products get non-ACTIVE statuses to exercise the lifecycle:
+          #   - PENDING: awaiting admin approval (not publicly visible)
+          #   - INACTIVE: seller-hidden (out of stock / supply issue)
+          #   - SUSPENDED: admin-hidden due to an issue
+          # REJECTED products are seeded separately below (they carry deleted_at).
+          status_overrides = {
+               10: ProductStatus.PENDING,    # uniqlo_airism_polo (seller 4)
+               13: ProductStatus.INACTIVE,   # converse_chuck_taylor_70 (seller 4)
+               18: ProductStatus.SUSPENDED,  # ace_hardware_tool_set (seller 5)
+          }
           products = []
           for p in product_data:
                slug = p["name"].replace("_", "-")
                products.append(Product(
                     id=p["id"], name=p["name"], slug=slug, brand=p["brand"],
                     description=p["description"], price=p["price"], stock=p["stock"],
-                    sku=p["sku"], user_id=p["user_id"], is_active=True
+                    sku=p["sku"], user_id=p["user_id"],
+                    status=status_overrides.get(p["id"], ProductStatus.ACTIVE)
                ))
+          # One rejected product (soft-deleted): demonstrates REJECTED + deleted_at.
+          products.append(Product(
+               id=33, name="counterfeit_airpods", slug="counterfeit-airpods", brand="Unknown",
+               description="Rejected during review (counterfeit).", price=250000, stock=0,
+               sku="REJ-AIRPODS-001", user_id=3,
+               status=ProductStatus.REJECTED, deleted_at="2026-08-01 12:00:00+07"
+          ))
           db.session.add_all(products)
           db.session.flush()
           logging.info(f"Products seeded: {len(products)} records.")

@@ -1,8 +1,18 @@
 from app.extensions import db
 import datetime as dt
 from uuid import uuid4
+from enum import Enum
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy import CheckConstraint, func
+
+
+class ProductStatus(Enum):
+    PENDING   = "PENDING"    # newly created by a seller, awaiting admin review
+    ACTIVE    = "ACTIVE"     # approved, publicly visible / purchasable
+    INACTIVE  = "INACTIVE"   # hidden by the seller (out of stock / supply issue)
+    SUSPENDED = "SUSPENDED"  # hidden by an admin due to an issue
+    REJECTED  = "REJECTED"   # admin rejected a pending product (also soft-deleted); terminal
+
 
 class Product(db.Model):
     __tablename__ = 'products'
@@ -20,7 +30,8 @@ class Product(db.Model):
     description = db.Column(db.String(1000), nullable=True)
     price       = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     created_at  = db.Column(db.DateTime(timezone=True), server_default=func.now())
-    is_active   = db.Column(db.Boolean, default=True)
+    # Lifecycle status (replaces the old is_active boolean). New products start PENDING.
+    status      = db.Column(db.Enum(ProductStatus), nullable=False, default=ProductStatus.PENDING)
     sku         = db.Column(db.String(50), nullable=True)
     images      = db.Column(ARRAY(db.String(150)), nullable=True)
     deleted_at  = db.Column(db.DateTime(timezone=True), nullable=True)
@@ -41,7 +52,7 @@ class Product(db.Model):
             'description': self.description,
             'price'      : float(self.price),
             'stock'      : self.stock,
-            'is_active'  : self.is_active,
+            'status'     : self.status.value if self.status else None,
             'images'     : self.images or [],
             'categories' : [cat.name for cat in self.categories] if self.categories else [],
             'created_at' : self.created_at.isoformat() if self.created_at else None,

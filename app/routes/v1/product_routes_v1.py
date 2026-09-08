@@ -5,7 +5,24 @@ from app.schemas import ProductSchema, ProductUpdateSchema, ProductErrorExamples
 from app.services import get_all_products, create_new_product, update_product, get_product_by_id, delete_product, ValidationResponse
 from app.models import Category, UserRole
 from app.services.auth_service import roles_required
-from flask_jwt_extended import get_jwt_identity, get_jwt
+from flask_jwt_extended import get_jwt_identity, get_jwt, verify_jwt_in_request
+
+
+def _optional_identity():
+    """
+    Resolve (jwt_user_id, roles) for endpoints that are public but role-aware.
+    Returns (None, []) for anonymous callers; (id, roles) when a valid token
+    is present.
+    """
+    try:
+        verify_jwt_in_request(optional=True)
+        user_id = get_jwt_identity()
+        if user_id is None:
+            return None, []
+        claims = get_jwt() or {}
+        return user_id, claims.get("roles", [])
+    except Exception:
+        return None, []
 
 product_bp = Blueprint(
     'products',
@@ -25,7 +42,8 @@ class ProductsRoot(MethodView):
     @product_bp.response(200, ProductSchema(many=True))
     def get(self, query_args):
         """Retrieve all products. Supports pagination, search, category/price filters and sorting."""
-        result = get_all_products(query_args)
+        jwt_user_id, roles = _optional_identity()
+        result = get_all_products(query_args, jwt_user_id=jwt_user_id, roles=roles)
         if result is None:
             return jsonify({"success": False, "message": "Failed to retrieve products"}), 400
         
@@ -74,7 +92,8 @@ class ProductDetail(MethodView):
     @product_bp.response(200, ProductSchema)
     def get(self, id):
         """Retrieve product detail by ID"""
-        product = get_product_by_id(id)
+        jwt_user_id, roles = _optional_identity()
+        product = get_product_by_id(id, jwt_user_id=jwt_user_id, roles=roles)
 
         if not product:
             abort(404, message="Product is not found")

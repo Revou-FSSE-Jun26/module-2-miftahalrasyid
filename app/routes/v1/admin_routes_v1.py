@@ -20,7 +20,7 @@ admin_bp = Blueprint(
 
 
 def _apply_admin_product_filters(query, args):
-    """Apply search/category/price/is_active/include_deleted/sort filters for admin product listings."""
+    """Apply search/category/price/status/include_deleted/sort filters for admin product listings."""
     from app.models.category_model import Category
 
     args = args or {}
@@ -41,9 +41,13 @@ def _apply_admin_product_filters(query, args):
     if max_price is not None:
         query = query.filter(Product.price <= max_price)
 
-    is_active = args.get("is_active")
-    if is_active is not None:
-        query = query.filter(Product.is_active == is_active)
+    status = args.get("status")
+    if status is not None:
+        from app.models.product_model import ProductStatus
+        try:
+            query = query.filter(Product.status == ProductStatus(status))
+        except ValueError:
+            pass
 
     # Admin view includes soft-deleted by default; allow opting out.
     if args.get("include_deleted") is False:
