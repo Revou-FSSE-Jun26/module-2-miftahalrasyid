@@ -2,7 +2,7 @@ from app.extensions import db
 import logging
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
-from app.models import Order, OrderStatus, Product, ProductStatus, UserRole
+from app.models import Order, OrderStatus, Product, SellerProduct, ProductStatus, UserRole
 from app.models.order_items_model import Order_item
 from . import ValidationResponse
 
@@ -31,8 +31,8 @@ def get_all_orders(jwt_user_id, roles, filters=None):
                 Order.deleted_at.is_(None),
                 Order.id.in_(
                     db.session.query(Order_item.order_id).join(
-                        Product, Order_item.product_id == Product.id
-                    ).filter(Product.user_id == int(jwt_user_id))
+                        SellerProduct, Order_item.seller_product_id == SellerProduct.id
+                    ).filter(SellerProduct.user_id == int(jwt_user_id))
                 )
             )
         else:
@@ -82,13 +82,13 @@ def get_order_by_id(order_id, jwt_user_id, roles):
         if is_admin:
             return order
 
-        # Seller: can view if order contains their product
+        # Seller: can view if order contains one of their listings
         if UserRole.SELLER.value in roles:
             has_seller_product = Order_item.query.join(
-                Product, Order_item.product_id == Product.id
+                SellerProduct, Order_item.seller_product_id == SellerProduct.id
             ).filter(
                 Order_item.order_id == order_id,
-                Product.user_id == int(jwt_user_id)
+                SellerProduct.user_id == int(jwt_user_id)
             ).first()
             if has_seller_product:
                 return order
@@ -110,7 +110,7 @@ def create_order(order_instance, items_data, jwt_user_id, roles):
     
     Args:
         order_instance: Order model instance (name set by schema)
-        items_data: list of {"product_id": int, "quantity": int}
+        items_data: list of {"seller_product_id": int, "quantity": int}
         jwt_user_id: Authenticated user's ID
         roles: User's roles from JWT
     
@@ -137,48 +137,55 @@ def create_order(order_instance, items_data, jwt_user_id, roles):
         # Validate items and calculate total
         total = 0
         order_items = []
-        seen_product_ids = set()
+        seen_listing_ids = set()
 
         for item in items_data:
-            product_id = item.get("product_id")
+            seller_product_id = item.get("seller_product_id")
             quantity = item.get("quantity")
 
-            if not product_id or not quantity:
-                return ValidationResponse(success=False, message="Each item must have product_id and quantity")
+            if not seller_product_id or not quantity:
+                return ValidationResponse(success=False, message="Each item must have seller_product_id and quantity")
 
             if not isinstance(quantity, int) or quantity < 1:
                 return ValidationResponse(success=False, message="Quantity must be a positive integer")
 
-            if product_id in seen_product_ids:
-                return ValidationResponse(success=False, message="Duplicate product in order items")
-            seen_product_ids.add(product_id)
+            if seller_product_id in seen_listing_ids:
+                return ValidationResponse(success=False, message="Duplicate listing in order items")
+            seen_listing_ids.add(seller_product_id)
 
-            # Verify product exists and is purchasable (only ACTIVE products can be ordered)
-            product = Product.query.filter(
-                Product.id == product_id,
-                Product.deleted_at.is_(None),
-                Product.status == ProductStatus.ACTIVE
-            ).first()
+            # Purchase gate: listing must be ACTIVE + not deleted AND its catalog
+            # product not deleted. Only then is it purchasable.
+            listing = (
+                SellerProduct.query
+                .join(Product, Product.id == SellerProduct.product_id)
+                .filter(
+                    SellerProduct.id == seller_product_id,
+                    SellerProduct.deleted_at.is_(None),
+                    SellerProduct.status == ProductStatus.ACTIVE,
+                    Product.deleted_at.is_(None),
+                ).first()
+            )
 
-            if not product:
-                return ValidationResponse(success=False, message=f"Product with id '{product_id}' is currently unavailable")
+            if not listing:
+                return ValidationResponse(success=False, message=f"Listing with id '{seller_product_id}' is currently unavailable")
 
-            # Self-purchase prevention: seller cannot order their own products
-            if product.user_id == int(jwt_user_id):
-                return ValidationResponse(success=False, message=f"You cannot order your own product (product_id: {product_id})")
+            # Self-purchase prevention: seller cannot order their own listing
+            if listing.user_id == int(jwt_user_id):
+                return ValidationResponse(success=False, message=f"You cannot order your own listing (seller_product_id: {seller_product_id})")
 
             # Check stock availability (reserve check only, no deduction yet)
-            if product.stock < quantity:
-                return ValidationResponse(success=False, message=f"Insufficient stock for product '{product.name}'. Available: {product.stock}")
+            if listing.stock < quantity:
+                display = listing.title or (listing.catalog.name if listing.catalog else str(seller_product_id))
+                return ValidationResponse(success=False, message=f"Insufficient stock for '{display}'. Available: {listing.stock}")
 
-            compound_price = float(product.price) * quantity
+            compound_price = float(listing.price) * quantity
             total += compound_price
 
             order_items.append({
-                "product_id": product_id,
+                "seller_product_id": seller_product_id,
                 "quantity": quantity,
                 "compound_price": compound_price,
-                "product": product
+                "listing": listing
             })
 
         # Calculate pricing: subtotal → discount → tax → total
@@ -206,7 +213,7 @@ def create_order(order_instance, items_data, jwt_user_id, roles):
         for item_data in order_items:
             order_item = Order_item(
                 order_id=order_instance.id,
-                product_id=item_data["product_id"],
+                seller_product_id=item_data["seller_product_id"],
                 quantity=item_data["quantity"],
                 compound_price=item_data["compound_price"]
             )
@@ -219,8 +226,8 @@ def create_order(order_instance, items_data, jwt_user_id, roles):
     except IntegrityError as e:
         db.session.rollback()
         error_msg = str(e.orig) if e.orig else str(e)
-        if "uq_order_product" in error_msg:
-            return ValidationResponse(success=False, message="Product already exists in this order")
+        if "uq_order_seller_product" in error_msg:
+            return ValidationResponse(success=False, message="Listing already exists in this order")
         logging.error(f"Integrity error creating order: {error_msg}")
         logging.debug(f"Integrity error creating order (full detail): {error_msg}", exc_info=True)
         return None
@@ -264,10 +271,10 @@ def update_order(order_id, update_data, jwt_user_id, roles):
             # Seller: can only update orders containing their products
             if UserRole.SELLER.value in roles:
                 has_seller_product = Order_item.query.join(
-                    Product, Order_item.product_id == Product.id
+                    SellerProduct, Order_item.seller_product_id == SellerProduct.id
                 ).filter(
                     Order_item.order_id == order_id,
-                    Product.user_id == int(jwt_user_id)
+                    SellerProduct.user_id == int(jwt_user_id)
                 ).first()
                 if not has_seller_product:
                     return ValidationResponse(success=False, message="Unauthorized to update this order")
@@ -369,11 +376,11 @@ def delete_order(order_id, jwt_user_id, roles, action="soft"):
             Order_item.deleted_at.is_(None)
         ).all()
         for item in order_items_list:
-            product = Product.query.get(item.product_id)
-            if product is None:
+            listing = SellerProduct.query.get(item.seller_product_id)
+            if listing is None:
                 return ValidationResponse(
                     success=False,
-                    message=f"Unable to process this order deletion. Product (ID: {item.product_id}) has been permanently removed from the system. Please contact an administrator.",
+                    message=f"Unable to process this order deletion. Listing (ID: {item.seller_product_id}) has been permanently removed from the system. Please contact an administrator.",
                     status_code=409
                 )
 
@@ -493,9 +500,9 @@ def _restore_stock(order_id):
     ).all()
 
     for item in order_items:
-        product = Product.query.get(item.product_id)
-        if product:
-            product.stock += item.quantity
+        listing = SellerProduct.query.get(item.seller_product_id)
+        if listing:
+            listing.stock += item.quantity
 
 
 def get_order_items(order_id):
@@ -508,20 +515,23 @@ def get_order_items(order_id):
             Order_item.deleted_at.is_(None)
         ).all()
 
-        # Resolve product names in one query. Deliberately NOT filtered by status
+        # Resolve listing titles in one query. Deliberately NOT filtered by status
         # or deleted_at: order history must show what was bought even if the
-        # product was later set INACTIVE/SUSPENDED/REJECTED or soft-deleted.
-        product_ids = [item.product_id for item in items]
+        # listing was later set INACTIVE/SUSPENDED/REJECTED or soft-deleted.
+        listing_ids = [item.seller_product_id for item in items]
         name_by_id = {}
-        if product_ids:
-            for p in Product.query.filter(Product.id.in_(product_ids)).all():
-                name_by_id[p.id] = p.name
+        pid_by_id = {}
+        if listing_ids:
+            for sp in SellerProduct.query.filter(SellerProduct.id.in_(listing_ids)).all():
+                name_by_id[sp.id] = sp.title
+                pid_by_id[sp.id] = sp.product_id
 
         return [
             {
                 "id": item.id,
-                "product_id": item.product_id,
-                "product_name": name_by_id.get(item.product_id),
+                "seller_product_id": item.seller_product_id,
+                "product_id": pid_by_id.get(item.seller_product_id),
+                "product_name": name_by_id.get(item.seller_product_id),
                 "quantity": item.quantity,
                 "compound_price": float(item.compound_price),
                 "created_at": item.created_at.isoformat() if item.created_at else None,

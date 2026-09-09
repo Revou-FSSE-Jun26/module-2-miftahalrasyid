@@ -72,6 +72,39 @@ class ProductQueryArgs(SanitizeMixin, PaginationQueryArgs):
     )
 
 
+class SellerProductQueryArgs(SanitizeMixin, PaginationQueryArgs):
+    """
+    Filtering/sorting for GET /seller-products/ (storefront browse) and a
+    seller's own listings. `search` matches catalog brand/name/model and the
+    listing title (case-insensitive). SanitizeMixin strips HTML (XSS defense).
+    """
+    search = ma.fields.Str(
+        load_default=None,
+        metadata={"description": "Case-insensitive match on brand/name/model/title.", "example": "iphone"},
+    )
+    category_id = ma.fields.Int(
+        load_default=None,
+        metadata={"description": "Only listings whose catalog product is in this category id.", "example": 1},
+    )
+    min_price = ma.fields.Decimal(
+        load_default=None,
+        validate=ma.validate.Range(min=0),
+        metadata={"description": "Minimum listing price (inclusive).", "example": 10000},
+    )
+    max_price = ma.fields.Decimal(
+        load_default=None,
+        validate=ma.validate.Range(min=0),
+        metadata={"description": "Maximum listing price (inclusive).", "example": 5000000},
+    )
+    sort = ma.fields.Str(
+        load_default=None,
+        validate=ma.validate.OneOf(
+            ["price", "-price", "title", "-title", "created_at", "-created_at"]
+        ),
+        metadata={"description": "Sort field. Prefix with '-' for descending.", "example": "price"},
+    )
+
+
 class CategoryQueryArgs(SanitizeMixin, PaginationQueryArgs):
     """Filtering/sorting for GET /categories/.
     SanitizeMixin strips HTML from the free-text `search` field (XSS defense).

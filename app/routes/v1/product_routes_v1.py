@@ -65,10 +65,10 @@ class ProductsRoot(MethodView):
         "422": {"description": "Input validation failed"},
     }, security=[{"BearerAuth": []}])
     @product_bp.arguments(ProductSchema, location="json")
-    @roles_required(UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @product_bp.response(201, ProductSchema)
     def post(self, product_instance):
-        """Add a new product"""
+        """Add a new catalog product (admin/superadmin only). Sellers use /seller-products."""
         roles = get_jwt()['roles']
         jwt_user_id = get_jwt_identity()
         
@@ -108,10 +108,10 @@ class ProductDetail(MethodView):
         "422": {"description": "Input validation failed"},
     })
     @product_bp.arguments(ProductUpdateSchema, location="json")
-    @roles_required(UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @product_bp.response(200, ProductSchema)
     def put(self, update_data, id):
-        """Update a product by ID."""
+        """Update a catalog product by ID (admin/superadmin only)."""
         roles = get_jwt()['roles']
         jwt_user_id = get_jwt_identity()
 
@@ -133,10 +133,10 @@ class ProductDetail(MethodView):
         "404": {"description": "Resource not found"},
     })
     @product_bp.arguments(DeleteActionSchema, location="json")
-    @roles_required(UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @product_bp.response(200, ProductSchema)
     def delete(self, delete_data, id):
-        """Delete a product by ID. Default=soft delete. Superadmin can pass {"action":"hard"}."""
+        """Delete a catalog product by ID (admin/superadmin). Default=soft. Superadmin can pass {"action":"hard"}."""
         roles = get_jwt()['roles']
         jwt_user_id = get_jwt_identity()
         action = delete_data.get("action", "soft")

@@ -3,7 +3,7 @@ import time
 import hashlib
 from flask import current_app
 from app.extensions import db
-from app.models import Order, OrderStatus, Product, ProductStatus
+from app.models import Order, OrderStatus, Product, SellerProduct, ProductStatus
 from app.models.order_items_model import Order_item
 from app.models.address_model import Address
 from app.models.user_model import User
@@ -79,32 +79,33 @@ def initiate_payment(order_id, jwt_user_id, address_id=None):
 
         item_details = []
         for item in order_items:
-            product = Product.query.filter(
-                Product.id == item.product_id,
-                Product.deleted_at.is_(None),
-                Product.status == ProductStatus.ACTIVE
+            listing = SellerProduct.query.filter(
+                SellerProduct.id == item.seller_product_id,
+                SellerProduct.deleted_at.is_(None),
+                SellerProduct.status == ProductStatus.ACTIVE
             ).first()
 
-            if not product:
+            if not listing:
                 return ValidationResponse(
                     success=False,
-                    message=f"Product with id '{item.product_id}' is currently unavailable",
+                    message=f"Listing with id '{item.seller_product_id}' is currently unavailable",
                     status_code=400
                 )
 
-            if product.stock < item.quantity:
+            if listing.stock < item.quantity:
+                display = listing.title or str(item.seller_product_id)
                 return ValidationResponse(
                     success=False,
-                    message=f"Insufficient stock for product '{product.name}'. Available: {product.stock}, required: {item.quantity}",
+                    message=f"Insufficient stock for '{display}'. Available: {listing.stock}, required: {item.quantity}",
                     status_code=400
                 )
 
             # Midtrans requires integer prices (IDR has no cents).
             item_details.append({
-                "id": str(product.id),
-                "price": int(round(float(product.price))),
+                "id": str(listing.id),
+                "price": int(round(float(listing.price))),
                 "quantity": item.quantity,
-                "name": product.name[:50],  # Midtrans caps name length
+                "name": (listing.title or "item")[:50],  # Midtrans caps name length
             })
 
         # Add tax as its own line item so item_details sum == gross_amount.
@@ -247,25 +248,25 @@ def handle_notification(notification):
             ).all()
 
             for item in order_items:
-                product = Product.query.get(item.product_id)
-                if not product:
+                listing = SellerProduct.query.get(item.seller_product_id)
+                if not listing:
                     db.session.rollback()
                     return ValidationResponse(
                         success=False,
-                        message=f"Product {item.product_id} no longer available",
+                        message=f"Listing {item.seller_product_id} no longer available",
                         status_code=400
                     )
-                if product.stock < item.quantity:
+                if listing.stock < item.quantity:
                     db.session.rollback()
                     return ValidationResponse(
                         success=False,
-                        message=f"Insufficient stock for product '{product.name}' at settlement",
+                        message=f"Insufficient stock for '{listing.title}' at settlement",
                         status_code=400
                     )
 
             for item in order_items:
-                product = Product.query.get(item.product_id)
-                product.stock -= item.quantity
+                listing = SellerProduct.query.get(item.seller_product_id)
+                listing.stock -= item.quantity
 
             order.status = OrderStatus.PAID
             db.session.commit()

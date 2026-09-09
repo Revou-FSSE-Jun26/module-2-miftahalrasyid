@@ -134,13 +134,13 @@ def delete_user(user_id, caller_roles, action="soft"):
         if user.roles and UserRole.SELLER in user.roles:
             from app.models.order_model import Order, OrderStatus
             from app.models.order_items_model import Order_item
-            from app.models.product_model import Product
+            from app.models.seller_product_model import SellerProduct
             active_paid_orders = Order_item.query.join(
-                Product, Order_item.product_id == Product.id
+                SellerProduct, Order_item.seller_product_id == SellerProduct.id
             ).join(
                 Order, Order_item.order_id == Order.id
             ).filter(
-                Product.user_id == user_id,
+                SellerProduct.user_id == user_id,
                 Order.status == OrderStatus.PAID,
                 Order.deleted_at.is_(None)
             ).count()

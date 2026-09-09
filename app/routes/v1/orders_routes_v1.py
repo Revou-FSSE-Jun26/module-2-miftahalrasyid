@@ -174,8 +174,8 @@ class OrderProducts(MethodView):
     @order_bp.response(200, OrderSchema)
     @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     def get(self, id):
-        """Get full product details for all items in an order (with ownership check)."""
-        from app.models import Product
+        """Get full listing details for all items in an order (with ownership check)."""
+        from app.models import SellerProduct
         from app.models.order_items_model import Order_item
 
         roles = get_jwt()['roles']
@@ -185,7 +185,7 @@ class OrderProducts(MethodView):
         if not order:
             abort(404, message="Order not found")
 
-        # Get order items with full product details
+        # Get order items with full listing (+ catalog spec) details
         items = Order_item.query.filter(
             Order_item.order_id == id,
             Order_item.deleted_at.is_(None)
@@ -193,12 +193,18 @@ class OrderProducts(MethodView):
 
         products_data = []
         for item in items:
-            product = Product.query.get(item.product_id)
-            if product:
-                product_info = product.to_dict()
-                product_info["quantity"] = item.quantity
-                product_info["compound_price"] = float(item.compound_price)
-                products_data.append(product_info)
+            listing = SellerProduct.query.get(item.seller_product_id)
+            if listing:
+                info = listing.to_dict()
+                if listing.catalog:
+                    info.update({
+                        "brand": listing.catalog.brand,
+                        "name": listing.catalog.name,
+                        "model": listing.catalog.model,
+                    })
+                info["quantity"] = item.quantity
+                info["compound_price"] = float(item.compound_price)
+                products_data.append(info)
 
         return jsonify({
             "success": True,

@@ -3,13 +3,12 @@ import shutil
 import os
 from app import create_app
 from app.extensions import db
-from app.models import User, UserRole, AuthProvider, Product, Category, Order, Order_item
+from app.models import User, UserRole, AuthProvider, Product, SellerProduct, Category, Order, Order_item
 from app.models.order_model import OrderStatus
 from app.models.product_model import ProductStatus
 from app.models.category_items_model import category_items
 from app.models.profile_model import Profile
 from app.models.address_model import Address
-from app.services.product_service import generate_slug
 from werkzeug.security import generate_password_hash
 SEED_PASSWORD = os.environ.get("SEED_PASSWORD", "changeme")
 # provider_key stores the HASHED password. Hash per-user so each row gets a
@@ -37,22 +36,22 @@ def seed_database():
 
           # --- Reset all tables (order matters due to foreign keys) ---
           logging.info("Clearing existing data...")
-          db.session.execute(db.text('TRUNCATE order_items, category_items, orders, products, addresses, profiles, categories, users RESTART IDENTITY CASCADE'))
+          db.session.execute(db.text('TRUNCATE order_items, category_items, orders, seller_products, products, addresses, profiles, categories, users RESTART IDENTITY CASCADE'))
           db.session.commit()
           logging.info("All tables cleared.")
 
-          # --- Clean orphaned folders in uploads/products/ ---
-          uploads_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'uploads', 'products')
-          if os.path.exists(uploads_dir):
-               # After reset, no products exist so all folders are orphaned
-               removed = 0
-               for folder_name in os.listdir(uploads_dir):
-                    folder_path = os.path.join(uploads_dir, folder_name)
-                    if os.path.isdir(folder_path):
-                         shutil.rmtree(folder_path)
-                         removed += 1
-               if removed:
-                    logging.info(f"Removed {removed} orphaned folders from uploads/products/.")
+          # --- Clean orphaned folders in uploads/products/ and uploads/seller_products/ ---
+          for sub in ('products', 'seller_products'):
+               updir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'uploads', sub)
+               if os.path.exists(updir):
+                    removed = 0
+                    for folder_name in os.listdir(updir):
+                         folder_path = os.path.join(updir, folder_name)
+                         if os.path.isdir(folder_path):
+                              shutil.rmtree(folder_path)
+                              removed += 1
+                    if removed:
+                         logging.info(f"Removed {removed} orphaned folders from uploads/{sub}/.")
 
           # =====================================================================
           # USERS (30 users with realistic names)
@@ -345,30 +344,48 @@ def seed_database():
           #   - INACTIVE: seller-hidden (out of stock / supply issue)
           #   - SUSPENDED: admin-hidden due to an issue
           # REJECTED products are seeded separately below (they carry deleted_at).
+          # Listing status overrides (status now lives on seller_products).
           status_overrides = {
                10: ProductStatus.PENDING,    # uniqlo_airism_polo (seller 4)
                13: ProductStatus.INACTIVE,   # converse_chuck_taylor_70 (seller 4)
                18: ProductStatus.SUSPENDED,  # ace_hardware_tool_set (seller 5)
           }
+
+          # Each seeded item becomes ONE catalog product + ONE seller listing.
+          # We deliberately keep the SAME id for both (catalog.id == listing.id)
+          # so the existing order_items rows (which now carry seller_product_id)
+          # map 1:1 without renumbering.
           products = []
+          listings = []
           for p in product_data:
                slug = p["name"].replace("_", "-")
                products.append(Product(
-                    id=p["id"], name=p["name"], slug=slug, brand=p["brand"],
-                    description=p["description"], price=p["price"], stock=p["stock"],
-                    sku=p["sku"], user_id=p["user_id"],
-                    status=status_overrides.get(p["id"], ProductStatus.ACTIVE)
+                    id=p["id"], brand=p["brand"], name=p["name"],
+                    description=p["description"],
                ))
-          # One rejected product (soft-deleted): demonstrates REJECTED + deleted_at.
+               listings.append(SellerProduct(
+                    id=p["id"], product_id=p["id"], user_id=p["user_id"],
+                    title=p["name"], slug=slug,
+                    price=p["price"], stock=p["stock"], sku=p["sku"],
+                    status=status_overrides.get(p["id"], ProductStatus.ACTIVE),
+               ))
+          # One rejected listing (soft-deleted): demonstrates REJECTED + deleted_at.
           products.append(Product(
-               id=33, name="counterfeit_airpods", slug="counterfeit-airpods", brand="Unknown",
-               description="Rejected during review (counterfeit).", price=250000, stock=0,
-               sku="REJ-AIRPODS-001", user_id=3,
-               status=ProductStatus.REJECTED, deleted_at="2026-08-01 12:00:00+07"
+               id=33, brand="Unknown", name="counterfeit_airpods",
+               description="Rejected during review (counterfeit).",
+          ))
+          listings.append(SellerProduct(
+               id=33, product_id=33, user_id=3,
+               title="counterfeit_airpods", slug="counterfeit-airpods",
+               price=250000, stock=0, sku="REJ-AIRPODS-001",
+               status=ProductStatus.REJECTED, deleted_at="2026-08-01 12:00:00+07",
           ))
           db.session.add_all(products)
           db.session.flush()
-          logging.info(f"Products seeded: {len(products)} records.")
+          db.session.add_all(listings)
+          db.session.flush()
+          logging.info(f"Catalog products seeded: {len(products)} records.")
+          logging.info(f"Seller listings seeded: {len(listings)} records.")
 
           # =====================================================================
           # CATEGORY_ITEMS (product-to-category mapping)
@@ -473,44 +490,44 @@ def seed_database():
           # ORDER_ITEMS (32+ items linking orders to products)
           # =====================================================================
           order_items_data = [
-                    Order_item(id=1, order_id=1, product_id=1, quantity=1, compound_price=21999000),
-                    Order_item(id=2, order_id=2, product_id=5, quantity=1, compound_price=4999000),
-                    Order_item(id=3, order_id=3, product_id=8, quantity=1, compound_price=1899000),
-                    Order_item(id=4, order_id=4, product_id=10, quantity=1, compound_price=299000),
-                    Order_item(id=5, order_id=5, product_id=24, quantity=1, compound_price=2899000),
-                    Order_item(id=6, order_id=6, product_id=25, quantity=1, compound_price=6499000),
-                    Order_item(id=7, order_id=7, product_id=12, quantity=1, compound_price=1599000),
-                    Order_item(id=8, order_id=8, product_id=13, quantity=1, compound_price=1199000),
-                    Order_item(id=9, order_id=9, product_id=14, quantity=1, compound_price=3299000),
-                    Order_item(id=10, order_id=10, product_id=18, quantity=1, compound_price=899000),
-                    Order_item(id=11, order_id=11, product_id=15, quantity=1, compound_price=1499000),
-                    Order_item(id=12, order_id=12, product_id=20, quantity=1, compound_price=189000),
-                    Order_item(id=13, order_id=13, product_id=7, quantity=1, compound_price=25999000),
-                    Order_item(id=14, order_id=14, product_id=29, quantity=1, compound_price=1499000),
-                    Order_item(id=15, order_id=15, product_id=14, quantity=1, compound_price=3299000),
-                    Order_item(id=16, order_id=16, product_id=4, quantity=1, compound_price=22999000),
-                    Order_item(id=17, order_id=17, product_id=30, quantity=1, compound_price=1599000),
-                    Order_item(id=18, order_id=18, product_id=19, quantity=1, compound_price=2799000),
-                    Order_item(id=19, order_id=19, product_id=21, quantity=1, compound_price=169000),
-                    Order_item(id=20, order_id=20, product_id=2, quantity=1, compound_price=19999000),
-                    Order_item(id=21, order_id=21, product_id=10, quantity=1, compound_price=299000),
-                    Order_item(id=22, order_id=22, product_id=18, quantity=1, compound_price=899000),
-                    Order_item(id=23, order_id=23, product_id=6, quantity=1, compound_price=10999000),
-                    Order_item(id=24, order_id=24, product_id=27, quantity=1, compound_price=1499000),
-                    Order_item(id=25, order_id=25, product_id=16, quantity=1, compound_price=12999000),
-                    Order_item(id=26, order_id=26, product_id=28, quantity=1, compound_price=15999000),
-                    Order_item(id=27, order_id=27, product_id=22, quantity=1, compound_price=1299000),
-                    Order_item(id=28, order_id=28, product_id=32, quantity=1, compound_price=1699000),
-                    Order_item(id=29, order_id=29, product_id=23, quantity=1, compound_price=899000),
-                    Order_item(id=30, order_id=30, product_id=29, quantity=1, compound_price=1499000),
-                    Order_item(id=31, order_id=31, product_id=5, quantity=1, compound_price=4999000),
-                    Order_item(id=32, order_id=32, product_id=31, quantity=1, compound_price=24999000),
+                    Order_item(id=1, order_id=1, seller_product_id=1, quantity=1, compound_price=21999000),
+                    Order_item(id=2, order_id=2, seller_product_id=5, quantity=1, compound_price=4999000),
+                    Order_item(id=3, order_id=3, seller_product_id=8, quantity=1, compound_price=1899000),
+                    Order_item(id=4, order_id=4, seller_product_id=10, quantity=1, compound_price=299000),
+                    Order_item(id=5, order_id=5, seller_product_id=24, quantity=1, compound_price=2899000),
+                    Order_item(id=6, order_id=6, seller_product_id=25, quantity=1, compound_price=6499000),
+                    Order_item(id=7, order_id=7, seller_product_id=12, quantity=1, compound_price=1599000),
+                    Order_item(id=8, order_id=8, seller_product_id=13, quantity=1, compound_price=1199000),
+                    Order_item(id=9, order_id=9, seller_product_id=14, quantity=1, compound_price=3299000),
+                    Order_item(id=10, order_id=10, seller_product_id=18, quantity=1, compound_price=899000),
+                    Order_item(id=11, order_id=11, seller_product_id=15, quantity=1, compound_price=1499000),
+                    Order_item(id=12, order_id=12, seller_product_id=20, quantity=1, compound_price=189000),
+                    Order_item(id=13, order_id=13, seller_product_id=7, quantity=1, compound_price=25999000),
+                    Order_item(id=14, order_id=14, seller_product_id=29, quantity=1, compound_price=1499000),
+                    Order_item(id=15, order_id=15, seller_product_id=14, quantity=1, compound_price=3299000),
+                    Order_item(id=16, order_id=16, seller_product_id=4, quantity=1, compound_price=22999000),
+                    Order_item(id=17, order_id=17, seller_product_id=30, quantity=1, compound_price=1599000),
+                    Order_item(id=18, order_id=18, seller_product_id=19, quantity=1, compound_price=2799000),
+                    Order_item(id=19, order_id=19, seller_product_id=21, quantity=1, compound_price=169000),
+                    Order_item(id=20, order_id=20, seller_product_id=2, quantity=1, compound_price=19999000),
+                    Order_item(id=21, order_id=21, seller_product_id=10, quantity=1, compound_price=299000),
+                    Order_item(id=22, order_id=22, seller_product_id=18, quantity=1, compound_price=899000),
+                    Order_item(id=23, order_id=23, seller_product_id=6, quantity=1, compound_price=10999000),
+                    Order_item(id=24, order_id=24, seller_product_id=27, quantity=1, compound_price=1499000),
+                    Order_item(id=25, order_id=25, seller_product_id=16, quantity=1, compound_price=12999000),
+                    Order_item(id=26, order_id=26, seller_product_id=28, quantity=1, compound_price=15999000),
+                    Order_item(id=27, order_id=27, seller_product_id=22, quantity=1, compound_price=1299000),
+                    Order_item(id=28, order_id=28, seller_product_id=32, quantity=1, compound_price=1699000),
+                    Order_item(id=29, order_id=29, seller_product_id=23, quantity=1, compound_price=899000),
+                    Order_item(id=30, order_id=30, seller_product_id=29, quantity=1, compound_price=1499000),
+                    Order_item(id=31, order_id=31, seller_product_id=5, quantity=1, compound_price=4999000),
+                    Order_item(id=32, order_id=32, seller_product_id=31, quantity=1, compound_price=24999000),
                     # Extra items (multiple items per order)
-                    Order_item(id=33, order_id=1, product_id=5, quantity=1, compound_price=4999000),
-                    Order_item(id=34, order_id=16, product_id=30, quantity=1, compound_price=1599000),
-                    Order_item(id=35, order_id=20, product_id=5, quantity=2, compound_price=9998000),
+                    Order_item(id=33, order_id=1, seller_product_id=5, quantity=1, compound_price=4999000),
+                    Order_item(id=34, order_id=16, seller_product_id=30, quantity=1, compound_price=1599000),
+                    Order_item(id=35, order_id=20, seller_product_id=5, quantity=2, compound_price=9998000),
                     # Item for Mike's PENDING order (33): product 1 (iphone, owner=seller 3), qty 1.
-                    Order_item(id=36, order_id=33, product_id=1, quantity=1, compound_price=21999000),
+                    Order_item(id=36, order_id=33, seller_product_id=1, quantity=1, compound_price=21999000),
                ]
           db.session.add_all(order_items_data)
           db.session.flush()
@@ -527,17 +544,17 @@ def seed_database():
                b'\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00'
                b'\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82'
           )
-          for product in products:
-               folder_path = os.path.join(uploads_dir, 'products', product.uuid)
+          for listing in listings:
+               folder_path = os.path.join(uploads_dir, 'seller_products', listing.uuid)
                os.makedirs(folder_path, exist_ok=True)
-               filename = f"{product.slug}_placeholder.png"
+               filename = f"{listing.slug}_placeholder.png"
                file_path = os.path.join(folder_path, filename)
                with open(file_path, 'wb') as f:
                     f.write(PLACEHOLDER_PNG)
-               relative_path = f"products/{product.uuid}/{filename}"
-               product.images = [relative_path]
+               relative_path = f"seller_products/{listing.uuid}/{filename}"
+               listing.images = [relative_path]
           db.session.flush()
-          logging.info(f"Product images seeded: {len(products)} placeholder images created.")
+          logging.info(f"Listing images seeded: {len(listings)} placeholder images created.")
 
           # =====================================================================
           # COMMIT ALL
@@ -551,6 +568,7 @@ def seed_database():
                db.session.execute(db.text("SELECT setval('addresses_id_seq', (SELECT MAX(id) FROM addresses))"))
                db.session.execute(db.text("SELECT setval('categories_id_seq', (SELECT MAX(id) FROM categories))"))
                db.session.execute(db.text("SELECT setval('products_id_seq', (SELECT MAX(id) FROM products))"))
+               db.session.execute(db.text("SELECT setval('seller_products_id_seq', (SELECT MAX(id) FROM seller_products))"))
                db.session.execute(db.text("SELECT setval('orders_id_seq', (SELECT MAX(id) FROM orders))"))
                db.session.execute(db.text("SELECT setval('order_items_id_seq', (SELECT MAX(id) FROM order_items))"))
                db.session.commit()
@@ -562,7 +580,8 @@ def seed_database():
                logging.info(f"  Profiles:       32")
                logging.info(f"  Addresses:      31")
                logging.info(f"  Categories:     10")
-               logging.info(f"  Products:       32")
+               logging.info(f"  Catalog Prods:  33")
+               logging.info(f"  Seller Listings:33")
                logging.info(f"  Category Items: 37")
                logging.info(f"  Orders:         32")
                logging.info(f"  Order Items:    35")

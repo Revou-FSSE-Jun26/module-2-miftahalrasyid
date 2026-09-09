@@ -35,7 +35,8 @@ class Order(db.Model):
     # Gateway-side status (e.g. pending, settlement, refund, expire); distinct from business `status`.
     payment_status   = db.Column(db.String(30), nullable=True)
 
-    products = db.relationship('Product', secondary='order_items', backref='orders', viewonly=True)
+    # Order lines now reference seller listings (order_items.seller_product_id).
+    seller_products = db.relationship('SellerProduct', secondary='order_items', backref='orders', viewonly=True)
     address  = db.relationship('Address', backref='orders')
 
     def to_dict(self, allowed_fields=None):

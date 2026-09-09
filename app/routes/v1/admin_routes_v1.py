@@ -33,28 +33,16 @@ def _apply_admin_product_filters(query, args):
     if category_id:
         query = query.filter(Product.categories.any(Category.id == category_id))
 
-    min_price = args.get("min_price")
-    if min_price is not None:
-        query = query.filter(Product.price >= min_price)
-
-    max_price = args.get("max_price")
-    if max_price is not None:
-        query = query.filter(Product.price <= max_price)
-
-    status = args.get("status")
-    if status is not None:
-        from app.models.product_model import ProductStatus
-        try:
-            query = query.filter(Product.status == ProductStatus(status))
-        except ValueError:
-            pass
+    # NOTE: price/status now live on seller_products, not the catalog product.
+    # The admin catalog view no longer filters on them here; a dedicated admin
+    # seller-products view can filter price/status against listings.
 
     # Admin view includes soft-deleted by default; allow opting out.
     if args.get("include_deleted") is False:
         query = query.filter(Product.deleted_at.is_(None))
 
     sort = args.get("sort")
-    sort_columns = {"price": Product.price, "name": Product.name, "created_at": Product.created_at}
+    sort_columns = {"name": Product.name, "created_at": Product.created_at}
     if sort:
         column = sort_columns.get(sort.lstrip("-"))
         if column is not None:
@@ -176,14 +164,21 @@ class AdminOrderProducts(MethodView):
             Order_item.deleted_at.is_(None)
         ).all()
 
+        from app.models import SellerProduct
         products_data = []
         for item in items:
-            product = Product.query.get(item.product_id)
-            if product:
-                product_info = product.to_dict()
-                product_info["quantity"] = item.quantity
-                product_info["compound_price"] = float(item.compound_price)
-                products_data.append(product_info)
+            listing = SellerProduct.query.get(item.seller_product_id)
+            if listing:
+                info = listing.to_dict()
+                if listing.catalog:
+                    info.update({
+                        "brand": listing.catalog.brand,
+                        "name": listing.catalog.name,
+                        "model": listing.catalog.model,
+                    })
+                info["quantity"] = item.quantity
+                info["compound_price"] = float(item.compound_price)
+                products_data.append(info)
 
         return jsonify({
             "success": True,

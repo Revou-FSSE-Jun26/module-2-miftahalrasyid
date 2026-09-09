@@ -6,10 +6,14 @@ from app.utils.sanitizer import SanitizeMixin
 
 
 class OrderItemInputSchema(ma.Schema):
-    """Schema for a single item in the order creation request."""
-    product_id = ma.fields.Int(
+    """Schema for a single item in the order creation request.
+
+    Post seller_products split: an order line references a specific seller's
+    listing (seller_product_id), not the abstract catalog product.
+    """
+    seller_product_id = ma.fields.Int(
         required=True,
-        error_messages={"required": "Product ID is required."},
+        error_messages={"required": "Seller product ID is required."},
         metadata={"example": 1}
     )
     quantity = ma.fields.Int(
@@ -46,15 +50,13 @@ class OrderSchema(SanitizeMixin, SQLAlchemyAutoSchema):
         metadata={"example": "my weekend order"}
     )
 
-    # --- Items: list of {product_id, quantity} for creating an order ---
-    # Example uses seeded products (id 1 = iphone_15_pro_max, id 8 = nike_air_max_90),
-    # both owned by sellers, so any buyer can order them.
+    # --- Items: list of {seller_product_id, quantity} for creating an order ---
     items = ma.fields.List(
         ma.fields.Nested(OrderItemInputSchema),
         required=True,
         load_only=True,
         error_messages={"required": "Order items are required."},
-        metadata={"example": [{"product_id": 1, "quantity": 2}, {"product_id": 8, "quantity": 1}]}
+        metadata={"example": [{"seller_product_id": 1, "quantity": 2}, {"seller_product_id": 8, "quantity": 1}]}
     )
 
     # --- dump_only: server-generated ---

@@ -6,166 +6,103 @@ from app.utils.sanitizer import SanitizeMixin
 
 
 class ProductSchema(SanitizeMixin, SQLAlchemyAutoSchema):
+    """
+    Catalog product (spec sheet). Admin-managed. No price/stock/status/owner —
+    those live on SellerProduct. See seller_products_design.md.
+    """
     class Meta:
         model                 = Product
-        load_instance         = True        # Convert input directly into a Product Model object
+        load_instance         = True
         sqla_session          = db.session
-        include_fk            = True        # Include foreign keys like user_id
-        include_relationships = False       # Don't auto-include relationships
-        # Exclude server-controlled columns so they never appear in the request body:
-        #  - seller/categories/uuid: relationships / internal id
-        #  - images: set only by the uploads endpoint
-        #  - updated_at: server-managed timestamp
-        exclude               = ('seller', 'categories', 'uuid','deleted_at')
+        include_fk            = True
+        include_relationships = False
+        exclude               = ('categories', 'uuid', 'deleted_at')
 
     # --- Required fields ---
-    name        = ma.fields.Str(
-        required=True, 
-        validate       = ma.validate.Length(min=1, error="Product name cannot be empty."),
+    brand = ma.fields.Str(
+        required=True,
+        validate=ma.validate.Length(min=1, error="Brand cannot be empty."),
+        error_messages={"required": "Brand name is not provided."}
+    )
+    name = ma.fields.Str(
+        required=True,
+        validate=ma.validate.Length(min=1, error="Product name cannot be empty."),
         error_messages={"required": "Product name is not provided."}
     )
-    brand       = ma.fields.Str(required=True, error_messages={"required": "Brand name is not provided."})
-    description = ma.fields.Str(required=True, error_messages={"required": "Description is not provided."})
-    price       = ma.fields.Decimal(
-        required       = True,
-        validate       = ma.validate.Range(min=0),
-        error_messages = {
-            "required"        : "Price is not provided.",
-            "invalid"         : "'price' must be a valid decimal number.",
-            "validator_failed": "Price cannot be a negative number."
-        }
-    )
 
-    # --- Optional fields ---
-    stock = ma.fields.Int(
-        required       = False,
-        load_default   = 0,
-        validate       = ma.validate.Range(min=0),
-        error_messages = {
-            "invalid"         : "'stock' must be a valid number.",
-            "validator_failed": "Stock cannot be a negative number."
-        }
-    )
-    sku = ma.fields.Str(
-        required     = False,
-        load_default = None,
-        allow_none   = True,
-        metadata     = {"example": "SKU-LAPTOP-001"}
-    )
-    # -- Output only fields
-    images = ma.fields.List( ma.fields.Str(), dump_only=True)
-    slug = ma.fields.Str(dump_only=True)
-    updated_at = ma.fields.DateTime(dump_only=True)
-    # status is server-controlled on create (always PENDING); never accepted from the client here.
-    status = ma.fields.Str(dump_only=True)
-    
-    # Category IDs: Optional list of category IDs to link to the product.
-    # This field is NOT on the model — we intercept it in pre_load so it never
-    # reaches the Product() constructor. The route handler reads it back from
-    # product_instance._category_ids_input after deserialization.
+    # --- Optional catalog spec fields ---
+    description    = ma.fields.Str(required=False, allow_none=True, load_default=None)
+    model          = ma.fields.Str(required=False, allow_none=True, load_default=None)
+    color          = ma.fields.Str(required=False, allow_none=True, load_default=None)
+    size           = ma.fields.Str(required=False, allow_none=True, load_default=None)
+    barcode        = ma.fields.Str(required=False, allow_none=True, load_default=None,
+                                   metadata={"example": "8991234567890"})
+    specifications = ma.fields.Raw(required=False, allow_none=True, load_default=None,
+                                   metadata={"example": {"ram": "16GB", "cpu": "M3"}})
+
+    # Category IDs: optional list to link categories (intercepted in pre_load).
     category_ids = ma.fields.List(
         ma.fields.Int(),
-        required     = False,
-        load_default = [],
-        load_only    = True,
-        metadata     = {"example": [1, 2]}
+        required=False,
+        load_default=[],
+        load_only=True,
+        metadata={"example": [1, 2]}
     )
-    user_id    = ma.fields.Int(
-        load_only    = True,
-        required     = False,
-        load_default = None,
-        metadata     = {"description": "Owner user ID. Sellers: auto-assigned. Admin/Superadmin: can specify."}
-    )
-    
-    # slug is excluded from input (see Meta.exclude); the service auto-generates
-    # it from the product name.
 
-    # --- dump_only: server-generated, never in request body ---
+    # --- dump_only: server-generated ---
     id         = ma.fields.Int(dump_only=True)
     created_at = ma.fields.DateTime(dump_only=True)
 
     @ma.pre_load
     def pop_category_ids(self, data, **kwargs):
-        """
-        Remove category_ids and slug from the payload BEFORE Marshmallow-SQLAlchemy
-        tries to pass them into Product(). The route handler reads category_ids
-        from raw request JSON. Slug is auto-generated in the service.
-        """
-        for field in ('name', 'brand', 'description', 'sku'):
+        for field in ('name', 'brand', 'description', 'model', 'color', 'size', 'barcode'):
             if field in data and isinstance(data[field], str):
                 data[field] = data[field].strip()
         data.pop('category_ids', [])
-        data.pop('slug', None)
-        # status is never client-settable on create (always PENDING); drop it so
-        # it can't reach the Product() constructor.
-        data.pop('status', None)
         return data
-    
+
+
 class ProductUpdateSchema(SanitizeMixin, SQLAlchemyAutoSchema):
+    """Partial update of a catalog product (admin only)."""
     class Meta:
         model                 = Product
-        load_instance         = False       # Return dict, not model instance
+        load_instance         = False
         sqla_session          = db.session
         include_fk            = True
         include_relationships = False
-        exclude               = ('seller', 'categories', 'uuid')
+        exclude               = ('categories', 'uuid')
 
-    # --- All fields optional for partial update ---
-    name        = ma.fields.Str(required=False, validate=ma.validate.Length(min=1))
-    brand       = ma.fields.Str(required=False)
-    description = ma.fields.Str(required=False)
-    price       = ma.fields.Decimal(required=False, validate=ma.validate.Range(min=0))
-    stock       = ma.fields.Int(required=False, validate=ma.validate.Range(min=0))
-    sku         = ma.fields.Str(required=False, allow_none=True)
-    # Lifecycle status. Accepted as a string; the *legality* of the transition
-    # (based on caller role + ownership) is enforced in the service layer.
-    status      = ma.fields.Str(
-        required=False,
-        validate=ma.validate.OneOf(
-            ["PENDING", "ACTIVE", "INACTIVE", "SUSPENDED", "REJECTED"],
-            error="Invalid status. Must be one of: PENDING, ACTIVE, INACTIVE, SUSPENDED, REJECTED."
-        ),
-    )
-    category_ids = ma.fields.List(
-        ma.fields.Int(),
-        required=False,
-        load_only=True
-    )
+    brand          = ma.fields.Str(required=False, validate=ma.validate.Length(min=1))
+    name           = ma.fields.Str(required=False, validate=ma.validate.Length(min=1))
+    description    = ma.fields.Str(required=False, allow_none=True)
+    model          = ma.fields.Str(required=False, allow_none=True)
+    color          = ma.fields.Str(required=False, allow_none=True)
+    size           = ma.fields.Str(required=False, allow_none=True)
+    barcode        = ma.fields.Str(required=False, allow_none=True)
+    specifications = ma.fields.Raw(required=False, allow_none=True)
+    category_ids   = ma.fields.List(ma.fields.Int(), required=False, load_only=True)
 
-    # --- Never accept from client ---
     id         = ma.fields.Int(dump_only=True)
-    slug       = ma.fields.Str(required=False, load_default=None, load_only=True)
-    user_id    = ma.fields.Int(required=False)
     created_at = ma.fields.DateTime(dump_only=True)
     deleted_at = ma.fields.DateTime(dump_only=True)
 
     @ma.pre_load
     def strip_strings(self, data, **kwargs):
-        for field in ('name', 'brand', 'description', 'sku'):
+        for field in ('name', 'brand', 'description', 'model', 'color', 'size', 'barcode'):
             if field in data and isinstance(data[field], str):
                 data[field] = data[field].strip()
         return data
 
 
 class ProductErrorExamples:
-    """Reusable error response examples for user routes."""
-    # --- 401: Unauthorized (JWT) ---
+    """Reusable error response examples for product routes."""
     TOKEN_MISSING = {
         "summary": "Authorization Token Missing",
-        "value": {
-            "code": 401,
-            "errors": "Missing authorization token.",
-            "status": "Unauthorized"
-        }
+        "value": {"code": 401, "errors": "Missing authorization token.", "status": "Unauthorized"}
     }
-
     TOKEN_EXPIRED = {
         "summary": "Authorization Token Expired",
-        "value": {
-            "code": 401,
-            "errors": "Token has expired.",
-            "status": "Unauthorized"
-        }
+        "value": {"code": 401, "errors": "Token has expired.", "status": "Unauthorized"}
     }
     RESPONSES_POST_PRODUCT = {
         "401": {

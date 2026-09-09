@@ -25,41 +25,40 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Default role assigned on registration
 - Can browse products (read-only, limited fields)
 - Can browse categories (read-only)
-- Can create orders with status `PENDING` (cart/checkout — stock NOT deducted yet, address can be null)
+- Can create orders with status `PENDING` (cart/checkout — stock NOT deducted yet, address can be null). Order items reference a specific seller listing (`seller_product_id`)
 - Can proceed to payment via `/api/v1/payment` which validates address and transitions order to `PAID`
 - Can soft-delete (cancel) own orders only when status is `COMPLETED` or `CANCELED`
 - Cannot delete orders with `PAID` or `PENDING` status
 - Cannot transition order status back to `PENDING`
 - Can read own orders only
 - Can update own profile (email, password, age)
-- Cannot create/update/delete products
+- Cannot create/update/delete catalog products or listings
 - Cannot manage categories
 - Cannot manage other users
 
 #### SELLER
 - Opt-in via `/api/v1/users/become-seller` (blocked if already seller or account deactivated)
-- Can create products (own only, auto-assigned to their user_id)
-- Can update own products (name, stock, brand, description, price, sku, categories)
-- Can soft-delete own products when status IS NOT `PAID` in orders
-- Can switch own product status between `ACTIVE` and `INACTIVE` in either direction (`ACTIVE → INACTIVE` when out of stock / supply issues, `INACTIVE → ACTIVE` when restocked). Cannot set any other status (`PENDING`, `SUSPENDED`, `REJECTED` are admin-controlled) and cannot self-approve a `PENDING` product.
-- Can read orders that contain their products
-- Can update order status (only for orders containing their products)
+- Can create **listings** via `POST /api/v1/seller-products/` (own only, auto-assigned to their user_id). A listing carries the seller's own price/stock/status/sku/title/images and references a shared catalog product. If the catalog product does not exist yet it is created automatically (find-or-create by barcode) — sellers do not touch the catalog `products` table directly
+- Can update own listings (title, stock, price, sku) via `PUT /api/v1/seller-products/<id>`
+- Can soft-delete own listings when not linked to a `PAID` order
+- Can switch own listing status between `ACTIVE` and `INACTIVE` in either direction (`ACTIVE → INACTIVE` when out of stock / supply issues, `INACTIVE → ACTIVE` when restocked). Cannot set any other status (`PENDING`, `SUSPENDED`, `REJECTED` are admin-controlled) and cannot self-approve a `PENDING` listing
+- Can read orders that contain their listings
+- Can update order status (only for orders containing their listings)
 - Cannot transition order status back to `PENDING`
-- Can upload/delete product images (own products only)
-- Cannot order their own products (self-purchase prevention)
+- Can upload/delete listing images (own listings only)
+- Cannot order their own listings (self-purchase prevention)
 - Cannot be soft-deleted when they have active orders with `PAID` status
-- Can only read categories and assign them to their products
-- Cannot create, update, or delete categories
+- Can only read the catalog and categories; cannot create/update/delete catalog products or categories
 - Cannot delete users
 - Cannot hard-delete anything except own uploaded images.
 
 #### ADMIN
 - Can create, read, update, and soft-delete categories
 - When deleting categories, associated `category_items` junction records are also deleted (no orphan relations)
-- Can create, read, update, and soft-delete products (including on behalf of other users)
-- May review a `PENDING` product and either approve it (`PENDING → ACTIVE`) or reject it (`PENDING → REJECTED`). On rejection the product is also soft-deleted (`deleted_at` set) so it never appears in `GET /api/v1/products/`; rejection is terminal (no revival — the seller must submit a new product)
-- May suspend or reinstate an `ACTIVE` product in either direction (`ACTIVE → SUSPENDED` when facing an issue, `SUSPENDED → ACTIVE` to reinstate). Suspension is always allowed and takes effect immediately — it is NOT blocked by existing `PAID` orders
-- Setting a product to `INACTIVE` or `SUSPENDED` immediately stops all new orders and payments for it (the purchase gate only allows `ACTIVE` products), and soft-deletes that product's `order_items` from orders still in `PENDING` order-status (unpaid carts). Existing `PAID` orders are never touched — they are honored and resolved through the normal order lifecycle (`PAID → COMPLETED` or `PAID → CANCELED` with refund)
+- Can create, read, update, and soft-delete **catalog products** (the shared spec) via `/api/v1/products/`
+- May review a `PENDING` **listing** and either approve it (`PENDING → ACTIVE`) or reject it (`PENDING → REJECTED`) via `PUT /api/v1/seller-products/<id>`. On rejection the listing is also soft-deleted (`deleted_at` set) so it never appears in browse; rejection is terminal (no revival — the seller must submit a new listing)
+- May suspend or reinstate an `ACTIVE` listing in either direction (`ACTIVE → SUSPENDED` when facing an issue, `SUSPENDED → ACTIVE` to reinstate). Suspension is always allowed and takes effect immediately — it is NOT blocked by existing `PAID` orders
+- Setting a listing to `INACTIVE` or `SUSPENDED` immediately stops all new orders and payments for it (the purchase gate only allows `ACTIVE` listings), and soft-deletes that listing's `order_items` from orders still in `PENDING` order-status (unpaid carts). Existing `PAID` orders are never touched — they are honored and resolved through the normal order lifecycle (`PAID → COMPLETED` or `PAID → CANCELED` with refund)
 - Can create, read, update, and soft-delete orders
 - Can create, read, update, and soft-delete users (including role and is_active management)
 - Can manage user roles EXCEPT `SUPERADMIN` — only a superadmin can grant the `SUPERADMIN` role (privilege-escalation guard, returns 403)
@@ -68,57 +67,106 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Cannot create uploads
 
 #### SUPERADMIN
-- Full CRUD on all resources: `users`, `products`, `orders`, `address`, `profile` and junction tables `order_items`, `category_items`
+- Full CRUD on all resources: `users`, `products` (catalog), `seller_products` (listings), `orders`, `address`, `profile` and junction tables `order_items`, `category_items`
 - Can hard-delete any resource (permanent removal from database)
-- Can create products/orders on behalf of other users
+- Can create catalog products / listings / orders on behalf of other users
 - Can bypass upload ownership checks
 - Can manage roles and is_active flag on all users
 - Is the only role that can grant the `SUPERADMIN` role to another user
 
 ### Orders & Cart
-- Orders created with `PENDING` status (acts as cart — stock not deducted, address can be null)
-- Only products with status `ACTIVE` (and not soft-deleted) can be added to an order or paid for. Adding or paying for a non-`ACTIVE` product (e.g. `INACTIVE`, `SUSPENDED`, `PENDING`, `REJECTED`) returns 400 with a generic "unavailable" message
+- Orders created with `PENDING` status (acts as cart — stock not deducted, address can be null). Each order item references a specific seller **listing** (`seller_product_id`), so the exact seller and price bought are preserved
+- Only listings with status `ACTIVE` (not soft-deleted, whose catalog product is not soft-deleted) can be added to an order or paid for. Adding or paying for a non-`ACTIVE` listing (e.g. `INACTIVE`, `SUSPENDED`, `PENDING`, `REJECTED`) returns 400 with a generic "unavailable" message
 - Payment endpoint (`/api/v1/payment`) processes the order:
   - Validates address: if no default address is set and none specified, returns `"default address is not set"`
-  - On success: transitions status to `PAID`, deducts product stock, sets delivery address
+  - On success: transitions status to `PAID`, deducts the listing's stock, sets delivery address
 - Order status transitions enforced: `PAID → COMPLETED` or `PAID → CANCELED` only
 - Seller and Buyer cannot transition order status back to `PENDING`
-- On cancellation (PAID → CANCELED): stock automatically restored
+- On cancellation (PAID → CANCELED): stock automatically restored to the listing
 - Buyer can only soft-delete orders with `COMPLETED` or `CANCELED` status
-- Duplicate products within same order prevented
+- Duplicate listings within same order prevented
 - Subtotal, discount, tax, and total calculated automatically
-- Query params on `GET /api/v1/orders/`: `status` (`PENDING`/`PAID`/`COMPLETED`/`CANCELED`), `sort` (`total`/`created_at`, prefix `-` for descending), plus `page`/`per_page`. Ownership scoping (buyer=own, seller=their products, admin=all) is always enforced and cannot be overridden
+- Query params on `GET /api/v1/orders/`: `status` (`PENDING`/`PAID`/`COMPLETED`/`CANCELED`), `sort` (`total`/`created_at`, prefix `-` for descending), plus `page`/`per_page`. Ownership scoping (buyer=own, seller=their listings, admin=all) is always enforced and cannot be overridden
 
-### Products
-- CRUD with ownership enforcement (only owner or admin+ can update/delete)
-- Product has a `status` lifecycle (replaces the old `is_active` boolean): `PENDING` | `ACTIVE` | `INACTIVE` | `SUSPENDED` | `REJECTED`
+### Catalog & Listings (products / seller_products)
+
+The product model is split into two tables so multiple sellers can offer the same
+item at their own price:
+
+- **`products` (catalog)** — the shared, canonical spec of an item: `brand`, `name`,
+  `description`, `model`, `color`, `size`, `barcode`, `specifications` (JSONB), plus
+  category links. It holds **no** price, stock, status, or owner. Admin-curated; write
+  access (`POST`/`PUT`/`DELETE /api/v1/products/`) is ADMIN/SUPERADMIN only. Reads are public.
+  `barcode` is partial-unique (unique only when not null).
+- **`seller_products` (listing)** — one seller's offer for a catalog product:
+  `title`, `slug`, `price`, `stock`, `status`, `sku`, `images`, `product_id`, `user_id`.
+  A seller has at most one (non-deleted) listing per catalog product
+  (`UNIQUE(product_id, user_id)`).
+
+#### Creating a listing (seller submits catalog + offer together)
+- `POST /api/v1/seller-products/` takes both catalog fields and listing fields. The
+  service **find-or-creates** the catalog product: if a non-deleted product with the
+  same `barcode` exists it is reused, otherwise a new catalog row is created. When no
+  barcode is given, a new catalog row is always created.
+- The new listing always starts as `PENDING` (client-supplied status is ignored); an
+  admin approves it before it becomes buyer-visible.
+
+#### Listing status lifecycle
+Status lives on the **listing** (`seller_products.status`): `PENDING` | `ACTIVE` |
+`INACTIVE` | `SUSPENDED` | `REJECTED`.
   - `PENDING`: newly created by a seller, awaiting admin review. Not publicly visible.
-  - `ACTIVE`: approved and publicly visible / listable.
-  - `INACTIVE`: temporarily hidden by the seller (out of stock / supply issue). Not publicly visible.
-  - `SUSPENDED`: hidden by an admin due to an issue. Not publicly visible.
-  - `REJECTED`: admin rejected the pending product; also soft-deleted. Terminal.
+  - `ACTIVE`: approved and publicly visible / purchasable.
+  - `INACTIVE`: temporarily hidden by the seller (out of stock / supply issue).
+  - `SUSPENDED`: hidden by an admin due to an issue.
+  - `REJECTED`: admin rejected the pending listing; also soft-deleted. Terminal.
 - Status transition matrix (enforced server-side; invalid transitions return 400):
   - SELLER (owner only): `ACTIVE → INACTIVE`, `INACTIVE → ACTIVE`
   - ADMIN / SUPERADMIN: `PENDING → ACTIVE`, `PENDING → REJECTED`, `ACTIVE → SUSPENDED`, `SUSPENDED → ACTIVE`, `ACTIVE → INACTIVE`, `INACTIVE → ACTIVE`
   - `REJECTED` is terminal for everyone (no revival)
-- New product is always created with status `PENDING` (client-supplied status on create is ignored)
-- Status changes go through the existing `PUT /api/v1/products/<id>` endpoint (the `status` field is validated against the matrix above based on caller role + ownership); there is no separate status endpoint
-- `status` is the single source of purchasability: only a product with `status = ACTIVE` (and `deleted_at IS NULL`) can be added to an order or paid for
-- Setting a product to `INACTIVE` or `SUSPENDED` is always allowed and takes effect immediately (never blocked by existing orders). Its two effects:
-  1. New sales stop instantly — the purchase gate rejects any attempt to add or pay for a non-`ACTIVE` product
-  2. Cart cleanup (per-item, cross-seller safe): only that product's own `order_items` are soft-deleted, and only in orders still in `PENDING` order-status (unpaid carts). Items belonging to other sellers/products in the same cart are left untouched, the order itself is NOT deleted, and the affected orders' totals (subtotal/discount/tax/total) are recomputed from their remaining live items. If a cart ends up with zero live items it is left in place (the buyer can delete it); it is never auto-deleted
-- Existing `PAID` orders are never modified when a product is suspended/deactivated: their `order_items` stay intact and the buyer can always view what they purchased (price is snapshotted on the `order_item`). `PAID` orders are resolved only through the normal order lifecycle (`PAID → COMPLETED` or `PAID → CANCELED` with refund + stock restore)
-- Rejecting a product (`PENDING → REJECTED`) sets both `status = REJECTED` and `deleted_at`. Hiding relies on `deleted_at` (the same filter used everywhere), so no query needs a special `status != REJECTED` clause
-- Deleting a product (soft or hard, via `DELETE /api/v1/products/<id>`) is still blocked when the product is linked to active orders with `PAID` status (returns 409). This `PAID` guard applies to deletion only — not to `INACTIVE`/`SUSPENDED` status changes
-- Visibility rules for reads:
-  - Unauthenticated users, and BUYER / SELLER who is not the owner: see a product only when `deleted_at IS NULL` AND `status = ACTIVE` (in both `GET /api/v1/products/` and `GET /api/v1/products/<id>`)
-  - The owner (seller), ADMIN, and SUPERADMIN: see the product regardless of status (any non-deleted status) in `GET /api/v1/products/` (their own rows) and `GET /api/v1/products/<id>`
-- Order detail (`GET /api/v1/orders/<id>` items) always shows the purchased product's name and the paid price, even if the product is later set to `INACTIVE`/`SUSPENDED`/`REJECTED` — order history is read from the `order_items` snapshot, not gated by the product's current status
-- Auto-generated slug from product name
-- Stock tracked with DB-level `CHECK (stock >= 0)` constraint
-- Category assignment via many-to-many relationship through `category_items` junction table
-- Product image upload support
-- Query params on `GET /api/v1/products/`: `search` (name, case-insensitive), `category_id`, `min_price`, `max_price`, `sort` (`price`/`name`/`created_at`, prefix `-` for descending), plus `page`/`per_page`
+- Status changes go through `PUT /api/v1/seller-products/<id>` (the `status` field is validated against the matrix based on caller role + ownership); there is no separate status endpoint.
+
+#### Purchasability & the two-gate rule
+A listing is purchasable only when its `status = ACTIVE` **and** its own `deleted_at IS NULL`
+**and** its catalog product's `deleted_at IS NULL`. Adding or paying for anything else
+returns 400 "unavailable".
+- Setting a listing to `INACTIVE` or `SUSPENDED` is always allowed and takes effect
+  immediately. Its two effects:
+  1. New sales stop instantly — the purchase gate rejects add/pay for a non-`ACTIVE` listing.
+  2. Cart cleanup (per-listing, cross-seller safe): only that listing's own `order_items`
+     are soft-deleted, and only in orders still in `PENDING` order-status (unpaid carts).
+     Other sellers' items in the same cart are untouched, the order is NOT deleted, and
+     affected order totals are recomputed from remaining live items.
+- Existing `PAID` orders are never modified when a listing is suspended/deactivated —
+  `order_items` stay intact (price is snapshotted on the `order_item`) and are resolved
+  through the normal order lifecycle.
+- Rejecting a listing (`PENDING → REJECTED`) sets both `status = REJECTED` and `deleted_at`.
+
+#### Deletion guards
+- Deleting a listing (`DELETE /api/v1/seller-products/<id>`) is blocked when it is linked
+  to active `PAID` orders (409). Deleting a catalog product (`DELETE /api/v1/products/<id>`)
+  is blocked when any of its listings is linked to a `PAID` order.
+
+#### Browse / visibility
+- `GET /api/v1/seller-products/` (public) is the storefront: it returns every `ACTIVE`,
+  in-stock listing whose catalog product is live, each row joined to its catalog spec and
+  tagged with `min_price` (the cheapest price across all listings of that same catalog
+  product, via a `MIN() OVER (PARTITION BY product_id)` window). Sorted by price ascending
+  by default.
+- `GET /api/v1/seller-products/mine` (auth) returns the caller's own listings in any
+  non-deleted status (admin sees all).
+- `GET /api/v1/products/` (public) lists catalog products that have at least one `ACTIVE`
+  in-stock listing; admin/superadmin see all non-deleted catalog rows.
+- Order detail (`GET /api/v1/orders/<id>` items) always shows the purchased listing's
+  title and paid price, even if the listing is later hidden — order history reads from the
+  `order_items` snapshot.
+- Listing slug auto-generated from the listing title; catalog `barcode` partial-unique;
+  stock tracked with DB-level `CHECK (stock >= 0)` on `seller_products`.
+- Listing images uploaded via the uploads endpoint (resource `seller_products`).
+- Query params on `GET /api/v1/seller-products/`: `search` (matches catalog brand/name/model
+  and listing title, case-insensitive), `category_id`, `min_price`, `max_price`,
+  `sort` (`price`/`title`/`created_at`, prefix `-` for descending), plus `page`/`per_page`.
+- Query params on `GET /api/v1/products/`: `search` (catalog name), `category_id`,
+  `category_name`, `sort` (`name`/`created_at`), plus `page`/`per_page`.
 
 ### Orders
 - Cannot be deleted when order has `PAID` in status
@@ -132,7 +180,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 
 ### Users & Profiles
 - Seller cannot be soft-deleted when they have active orders with `PAID` status
-- Seller cannot order their own products
+- Seller cannot order their own listings
 - Privilege-escalation guard: only a superadmin can grant the `SUPERADMIN` role (admin attempts return 403)
 - Become Seller flow with guard checks (already seller, deactivated account)
 - Profile and address management
@@ -145,9 +193,9 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - DB-level constraint prevents negative stock
 
 ### Uploads
-- Product image upload with ownership enforcement
+- Listing image upload with ownership enforcement (resource `seller_products`, images stored on the listing)
 - Admin/Superadmin bypass ownership for image management
-- Seller can only manage images for own products
+- Seller can only manage images for own listings
 - Buyer cannot upload
 
 ### Logging
@@ -407,25 +455,38 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
   -d '{"email": "justin@gmail.com", "password": "Password1234"}'
 ```
 
-**Create a product (requires seller/admin token):**
+**Browse listings (public storefront):**
 ```bash
-curl -X POST http://localhost:8000/api/v1/products/ \
-  -H "Authorization: Bearer <your-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "wireless_mouse", "brand": "Logitech", "description": "Ergonomic wireless mouse", "price": 499000, "stock": 50, "category_ids": [1]}'
+curl "http://localhost:8000/api/v1/seller-products/?search=mouse"
 ```
 
-**Update a product:**
+**Create a listing (requires seller/admin token; find-or-creates the catalog product, starts PENDING):**
 ```bash
-curl -X PUT http://localhost:8000/api/v1/products/1 \
+curl -X POST http://localhost:8000/api/v1/seller-products/ \
+  -H "Authorization: Bearer <your-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"brand": "Logitech", "name": "wireless_mouse", "description": "Ergonomic wireless mouse", "barcode": "LOGI-MX-001", "title": "Logitech MX Master 3S - BNIB", "price": 499000, "stock": 50, "category_ids": [1]}'
+```
+
+**Update a listing (price/stock, or status transition):**
+```bash
+curl -X PUT http://localhost:8000/api/v1/seller-products/1 \
   -H "Authorization: Bearer <your-token>" \
   -H "Content-Type: application/json" \
   -d '{"price": 19999000, "stock": 30}'
 ```
 
-**Delete a product (soft delete):**
+**Approve a listing (admin: PENDING -> ACTIVE):**
 ```bash
-curl -X DELETE http://localhost:8000/api/v1/products/1 \
+curl -X PUT http://localhost:8000/api/v1/seller-products/1 \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "ACTIVE"}'
+```
+
+**Delete a listing (soft delete):**
+```bash
+curl -X DELETE http://localhost:8000/api/v1/seller-products/1 \
   -H "Authorization: Bearer <your-token>" \
   -H "Content-Type: application/json" \
   -d '{"action": "soft"}'
@@ -435,11 +496,12 @@ Access Swagger UI documentation on **[http://localhost:8000/swagger-ui](http://l
 
 ## Business Logic
 
-- **Auto Slug Generation** — Product slugs are auto-generated from the product name on creation. Duplicates get a numeric suffix (`-1`, `-2`, etc.). Slug regenerates when name is updated.
-- **Deletion Guard** — Products linked to active (PAID) orders cannot be deleted. The API returns a 409 with a clear message.
-- **Image Lifecycle** — On soft or hard delete of a product, all associated image files are removed from disk and the `images` column is nullified. Upload failures roll back the file if the DB commit fails — no orphaned files.
-- **Order Pricing** — Orders auto-calculate subtotal, tax (11%), and total from product prices and quantities. Stock is deducted on order creation and restored on cancellation.
-- **Stock Validation** — Orders fail if requested quantity exceeds available stock.
+- **Auto Slug Generation** — Listing slugs are auto-generated from the listing title on creation. Duplicates get a numeric suffix (`-1`, `-2`, etc.). Slug regenerates when the title is updated.
+- **Catalog Find-or-Create** — When a seller submits a listing, the catalog product is reused if a non-deleted product with the same `barcode` exists, otherwise a new catalog row is created (Option B). A seller may have only one listing per catalog product.
+- **Deletion Guard** — Listings linked to active (PAID) orders cannot be deleted; a catalog product with any such listing cannot be deleted either. The API returns 409 with a clear message.
+- **Image Lifecycle** — On soft or hard delete of a listing, associated image files are removed from disk and the `images` column is nullified. Upload failures roll back the file if the DB commit fails — no orphaned files.
+- **Order Pricing** — Orders auto-calculate subtotal, tax (11%), and total from listing prices and quantities. Stock is deducted on payment settlement and restored on cancellation.
+- **Stock Validation** — Orders fail if requested quantity exceeds the listing's available stock.
 - **Email Normalization** — Gmail dots and aliases are normalized to prevent duplicate accounts (e.g., `j.doe@gmail.com` → `jdoe@gmail.com`).
 - **Soft/Hard Delete Strategy** — All resources support soft delete (sets `deleted_at`). Superadmin can hard delete permanently via `{"action": "hard"}`.
 
@@ -450,10 +512,11 @@ Populate the database with realistic data for development and testing:
 - 32 profiles with bios
 - 31 addresses across Indonesia
 - 10 categories
-- 32 products with real brand names and IDR pricing
+- 33 catalog products (spec sheets) with real brand names
+- 33 seller listings (one per catalog product) with IDR pricing, stock, and status
 - 39 category-product mappings
-- 32 orders with various statuses
-- 35 order items
+- 33 orders with various statuses
+- 36 order items (each referencing a seller listing)
 
 All seeded users use password: `Password1234`
 
@@ -521,6 +584,7 @@ flowchart TD
 │   │   ├── order_items_model.py
 │   │   ├── order_model.py
 │   │   ├── product_model.py
+│   │   ├── seller_product_model.py
 │   │   ├── profile_model.py
 │   │   └── user_model.py
 │   ├── permissions/
@@ -536,6 +600,7 @@ flowchart TD
 │   │       ├── orders_routes_v1.py
 │   │       ├── payment_routes_v1.py
 │   │       ├── product_routes_v1.py
+│   │       ├── seller_products_routes_v1.py
 │   │       ├── upload_routes_v1.py
 │   │       └── users_routes_v1.py
 │   ├── schemas/
@@ -549,6 +614,7 @@ flowchart TD
 │   │   ├── product_schema.py
 │   │   ├── profile_schema.py
 │   │   ├── query_schema.py
+│   │   ├── seller_product_schema.py
 │   │   └── user_schema.py
 │   ├── services/
 │   │   ├── __init__.py
@@ -560,6 +626,7 @@ flowchart TD
 │   │   ├── payment_service.py
 │   │   ├── product_service.py
 │   │   ├── profile_service.py
+│   │   ├── seller_product_service.py
 │   │   ├── upload_service.py
 │   │   └── user_service.py
 │   └── utils/
@@ -698,15 +765,30 @@ Full interactive documentation available online at **[https://module-2-miftahalr
 | `PUT` | `/api/v1/users/me/addresses/<id>` | Update address | Bearer |
 | `DELETE` | `/api/v1/users/me/addresses/<id>` | Delete address | Bearer |
 
-### Products
+### Products (catalog)
+
+Catalog products are the shared spec. Reads are public; writes are ADMIN/SUPERADMIN only.
 
 | Method | Endpoint | Description | Auth |
 | :--- | :--- | :--- | :---: |
-| `GET` | `/api/v1/products/` | List products | - |
-| `POST` | `/api/v1/products/` | Create product | Bearer |
-| `GET` | `/api/v1/products/<id>` | Get product | - |
-| `PUT` | `/api/v1/products/<id>` | Update product | Bearer |
-| `DELETE` | `/api/v1/products/<id>` | Delete product | Bearer |
+| `GET` | `/api/v1/products/` | List catalog products (with active listings) | - |
+| `POST` | `/api/v1/products/` | Create catalog product (admin/superadmin) | Bearer |
+| `GET` | `/api/v1/products/<id>` | Get catalog product | - |
+| `PUT` | `/api/v1/products/<id>` | Update catalog product (admin/superadmin) | Bearer |
+| `DELETE` | `/api/v1/products/<id>` | Delete catalog product (admin/superadmin) | Bearer |
+
+### Seller Products (listings)
+
+A seller's per-offer listing (price/stock/status/title/images) referencing a catalog product.
+
+| Method | Endpoint | Description | Auth |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/v1/seller-products/` | Browse listings (public storefront, tagged with `min_price`) | - |
+| `POST` | `/api/v1/seller-products/` | Create a listing (find-or-creates catalog; starts `PENDING`) | Bearer |
+| `GET` | `/api/v1/seller-products/mine` | List the caller's own listings (any status) | Bearer |
+| `GET` | `/api/v1/seller-products/<id>` | Get a listing | - |
+| `PUT` | `/api/v1/seller-products/<id>` | Update listing / status transition (seller or admin) | Bearer |
+| `DELETE` | `/api/v1/seller-products/<id>` | Delete a listing (own, or admin) | Bearer |
 
 ### Categories
 
@@ -717,7 +799,6 @@ Full interactive documentation available online at **[https://module-2-miftahalr
 | `GET` | `/api/v1/categories/<id>` | Get category | - |
 | `PUT` | `/api/v1/categories/<id>` | Update category | Bearer |
 | `DELETE` | `/api/v1/categories/<id>` | Delete category | Bearer |
-| `GET` | `/api/v1/categories/<id>/products` | Products in category | - |
 
 ### Orders
 

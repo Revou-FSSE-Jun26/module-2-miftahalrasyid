@@ -64,28 +64,56 @@ FIELD_PERMISSIONS = {
             "delete": None,
         },
     },
+    # --- Catalog products (spec sheet). Write = admin-curated; read = everyone. ---
     "products": {
         "SUPERADMIN": {
-            "create": {"user_id", "name", "stock", "brand", "description", "price", "status", "sku", "category_ids"},
-            "read":   {"id", "user_id", "name", "slug", "stock", "brand", "description", "price", "created_at", "status", "sku", "images", "categories", "deleted_at"},
-            "update": {"user_id", "name", "stock", "brand", "description", "price", "status", "sku", "category_ids"},
+            "create": {"brand", "name", "description", "model", "color", "size", "barcode", "specifications", "category_ids"},
+            "read":   {"id", "uuid", "brand", "name", "description", "model", "color", "size", "barcode", "specifications", "categories", "created_at", "deleted_at"},
+            "update": {"brand", "name", "description", "model", "color", "size", "barcode", "specifications", "category_ids"},
             "delete": "hard",
         },
         "ADMIN": {
-            "create": {"user_id", "name", "stock", "brand", "description", "price", "status", "sku", "category_ids"},
-            "read":   {"id", "user_id", "name", "slug", "stock", "brand", "description", "price", "created_at", "status", "sku", "images", "categories", "deleted_at"},
-            "update": {"user_id", "name", "stock", "brand", "description", "price", "status", "sku", "category_ids"},
+            "create": {"brand", "name", "description", "model", "color", "size", "barcode", "specifications", "category_ids"},
+            "read":   {"id", "uuid", "brand", "name", "description", "model", "color", "size", "barcode", "specifications", "categories", "created_at", "deleted_at"},
+            "update": {"brand", "name", "description", "model", "color", "size", "barcode", "specifications", "category_ids"},
             "delete": "soft",
         },
         "SELLER": {
-            "create": {"name", "stock", "brand", "description", "price", "sku", "category_ids"},
-            "read":   {"id", "user_id", "name", "slug", "stock", "brand", "description", "price", "created_at", "status", "sku", "images", "categories"},
-            "update": {"name", "stock", "brand", "description", "price", "sku", "category_ids", "status"},
+            "create": set(),   # sellers create catalog only implicitly via seller-products (Option B)
+            "read":   {"id", "uuid", "brand", "name", "description", "model", "color", "size", "barcode", "specifications", "categories", "created_at"},
+            "update": set(),
+            "delete": None,
+        },
+        "BUYER": {
+            "create": set(),
+            "read":   {"id", "uuid", "brand", "name", "description", "model", "color", "size", "barcode", "specifications", "categories", "created_at"},
+            "update": set(),
+            "delete": None,
+        },
+    },
+    # --- Seller listings (the offer: price/stock/status/images/title). ---
+    "seller_products": {
+        "SUPERADMIN": {
+            "create": {"user_id", "title", "price", "stock", "status", "sku"},
+            "read":   {"id", "uuid", "product_id", "seller_id", "title", "slug", "price", "stock", "status", "sku", "images", "created_at", "deleted_at"},
+            "update": {"title", "price", "stock", "status", "sku"},
+            "delete": "hard",
+        },
+        "ADMIN": {
+            "create": {"user_id", "title", "price", "stock", "status", "sku"},
+            "read":   {"id", "uuid", "product_id", "seller_id", "title", "slug", "price", "stock", "status", "sku", "images", "created_at", "deleted_at"},
+            "update": {"title", "price", "stock", "status", "sku"},
+            "delete": "soft",
+        },
+        "SELLER": {
+            "create": {"title", "price", "stock", "sku"},
+            "read":   {"id", "uuid", "product_id", "seller_id", "title", "slug", "price", "stock", "status", "sku", "images", "created_at"},
+            "update": {"title", "price", "stock", "sku", "status"},
             "delete": "soft",
         },
         "BUYER": {
             "create": set(),
-            "read":   {"id", "user_id", "name", "slug", "stock", "brand", "description", "price", "created_at", "sku", "images", "categories"},
+            "read":   {"id", "product_id", "seller_id", "title", "slug", "price", "stock", "status", "images", "created_at"},
             "update": set(),
             "delete": None,
         },
@@ -118,7 +146,7 @@ FIELD_PERMISSIONS = {
     },
     "uploads": {
         "SUPERADMIN": {
-            "create": {"products"},
+            "create": {"products", "seller_products"},
             "delete": "hard",
             "bypass_ownership": True,
         },
@@ -128,7 +156,7 @@ FIELD_PERMISSIONS = {
             "bypass_ownership": True,
         },
         "SELLER": {
-            "create": {"products"},
+            "create": {"products", "seller_products"},
             "delete": "hard",
             "bypass_ownership": False,
         },

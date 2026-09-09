@@ -2,7 +2,7 @@ import os
 import logging
 from werkzeug.utils import secure_filename
 from app.extensions import db
-from app.models import Product, UserRole
+from app.models import Product, SellerProduct, UserRole
 from . import ValidationResponse
 
 # Configuration
@@ -67,59 +67,59 @@ def upload_image(resource, resource_id, file, jwt_user_id, roles):
     if file_size > MAX_FILE_SIZE:
         return ValidationResponse(success=False, message=f"File size exceeds the maximum limit of {MAX_FILE_SIZE // (1024 * 1024)}MB")
 
-    # Resource-specific logic
-    if resource == "products":
-        return _upload_product_image(resource_id, file, jwt_user_id, bypass_ownership)
+    # Resource-specific logic. Images live on the seller listing now.
+    if resource in ("seller_products", "products"):
+        return _upload_listing_image(resource_id, file, jwt_user_id, bypass_ownership)
 
     return ValidationResponse(success=False, message="Upload handler not implemented for this resource")
 
 
-def _upload_product_image(product_id, file, jwt_user_id, bypass_ownership):
-    """Handle image upload for a product."""
+def _upload_listing_image(listing_id, file, jwt_user_id, bypass_ownership):
+    """Handle image upload for a seller listing."""
     try:
-        product = Product.query.filter(
-            Product.id == product_id,
-            Product.deleted_at.is_(None)
+        listing = SellerProduct.query.filter(
+            SellerProduct.id == listing_id,
+            SellerProduct.deleted_at.is_(None)
         ).first()
 
-        if not product:
-            return ValidationResponse(success=False, message="Product not found")
+        if not listing:
+            return ValidationResponse(success=False, message="Listing not found")
 
         # Ownership check (superadmin bypasses)
         if not bypass_ownership:
-            if product.user_id != int(jwt_user_id):
-                return ValidationResponse(success=False, message="You can only upload images to your own products")
+            if listing.user_id != int(jwt_user_id):
+                return ValidationResponse(success=False, message="You can only upload images to your own listings")
 
         # Check max images limit
-        current_images = product.images or []
+        current_images = listing.images or []
         if len(current_images) >= MAX_IMAGES_PER_PRODUCT:
-            return ValidationResponse(success=False, message=f"Maximum {MAX_IMAGES_PER_PRODUCT} images per product reached")
+            return ValidationResponse(success=False, message=f"Maximum {MAX_IMAGES_PER_PRODUCT} images per listing reached")
 
-        # Build file path: uploads/products/<uuid>/<slug>_<filename>.<ext>
+        # Build file path: uploads/seller_products/<uuid>/<slug>_<filename>.<ext>
         ext = _get_extension(file.filename)
         safe_original = secure_filename(file.filename.rsplit('.', 1)[0])
-        final_filename = f"{product.slug}_{safe_original}.{ext}"
+        final_filename = f"{listing.slug}_{safe_original}.{ext}"
 
-        folder_path = os.path.join(UPLOAD_ROOT, 'products', product.uuid)
+        folder_path = os.path.join(UPLOAD_ROOT, 'seller_products', listing.uuid)
         os.makedirs(folder_path, exist_ok=True)
 
         file_path = os.path.join(folder_path, final_filename)
 
         # Check if file already exists
         if os.path.exists(file_path):
-            return ValidationResponse(success=False, message="An image with this name already exists for this product")
+            return ValidationResponse(success=False, message="An image with this name already exists for this listing")
 
         # Save file
         file.save(file_path)
 
         # Build relative path for DB storage
-        relative_path = f"products/{product.uuid}/{final_filename}"
+        relative_path = f"seller_products/{listing.uuid}/{final_filename}"
 
         # Append to images array
-        if product.images is None:
-            product.images = [relative_path]
+        if listing.images is None:
+            listing.images = [relative_path]
         else:
-            product.images = product.images + [relative_path]
+            listing.images = listing.images + [relative_path]
 
         try:
             db.session.commit()
@@ -134,18 +134,18 @@ def _upload_product_image(product_id, file, jwt_user_id, bypass_ownership):
             logging.error(f"DB commit failed for image upload, cleaned file: {str(e)}")
             return None
 
-        logging.info(f"Image uploaded for product {product_id}: {relative_path}")
+        logging.info(f"Image uploaded for listing {listing_id}: {relative_path}")
 
         return {
             "success": True,
             "message": "Image uploaded successfully",
             "image_path": relative_path,
-            "total_images": len(product.images)
+            "total_images": len(listing.images)
         }
 
     except Exception as e:
         db.session.rollback()
-        logging.error(f"Failed to upload image for product {product_id}: {str(e)}")
+        logging.error(f"Failed to upload image for listing {listing_id}: {str(e)}")
         return None
 
 
@@ -179,37 +179,37 @@ def delete_image(resource, resource_id, filename, jwt_user_id, roles):
     if not can_delete:
         return ValidationResponse(success=False, message="Your role does not have permission to delete uploaded files")
 
-    if resource == "products":
-        return _delete_product_image(resource_id, filename, jwt_user_id, bypass_ownership)
+    if resource in ("seller_products", "products"):
+        return _delete_listing_image(resource_id, filename, jwt_user_id, bypass_ownership)
 
     return ValidationResponse(success=False, message=f"Delete not supported for resource '{resource}'")
 
 
-def _delete_product_image(product_id, filename, jwt_user_id, bypass_ownership):
-    """Handle image deletion for a product."""
+def _delete_listing_image(listing_id, filename, jwt_user_id, bypass_ownership):
+    """Handle image deletion for a seller listing."""
     try:
-        product = Product.query.filter(
-            Product.id == product_id,
-            Product.deleted_at.is_(None)
+        listing = SellerProduct.query.filter(
+            SellerProduct.id == listing_id,
+            SellerProduct.deleted_at.is_(None)
         ).first()
 
-        if not product:
-            return ValidationResponse(success=False, message="Product not found")
+        if not listing:
+            return ValidationResponse(success=False, message="Listing not found")
 
         # Ownership check (admin/superadmin bypass)
         if not bypass_ownership:
-            if product.user_id != int(jwt_user_id):
-                return ValidationResponse(success=False, message="You can only delete images from your own products")
+            if listing.user_id != int(jwt_user_id):
+                return ValidationResponse(success=False, message="You can only delete images from your own listings")
 
         # Find the image in the array
-        relative_path = f"products/{product.uuid}/{filename}"
-        current_images = product.images or []
+        relative_path = f"seller_products/{listing.uuid}/{filename}"
+        current_images = listing.images or []
 
         if relative_path not in current_images:
-            return ValidationResponse(success=False, message="Image not found for this product")
+            return ValidationResponse(success=False, message="Image not found for this listing")
 
         # Remove from DB array first, then filesystem
-        product.images = [img for img in current_images if img != relative_path]
+        listing.images = [img for img in current_images if img != relative_path]
         try:
             db.session.commit()
         except Exception as e:
@@ -226,10 +226,10 @@ def _delete_product_image(product_id, filename, jwt_user_id, bypass_ownership):
             if os.path.isdir(folder_path) and not os.listdir(folder_path):
                 os.rmdir(folder_path)
 
-        logging.info(f"Image deleted for product {product_id}: {relative_path}")
+        logging.info(f"Image deleted for listing {listing_id}: {relative_path}")
         return {"success": True, "message": "Image deleted successfully"}
 
     except Exception as e:
         db.session.rollback()
-        logging.error(f"Failed to delete image for product {product_id}: {str(e)}")
+        logging.error(f"Failed to delete image for listing {listing_id}: {str(e)}")
         return None
