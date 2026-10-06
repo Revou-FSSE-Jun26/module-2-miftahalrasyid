@@ -1,7 +1,8 @@
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/wGq_UtnU)
 
-# RevoShop (Backend) 
-> A secure and scalable RESTful online store API e-commerce platform, built with Flask and PostgreSQL  — designed for teams that track work without heavy project management overhead.
+# RevoShop (Backend)
+
+> A secure and scalable RESTful online store API e-commerce platform, built with Flask and PostgreSQL — designed for teams that track work without heavy project management overhead.
 
 ## Overview
 
@@ -10,6 +11,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 ## Features
 
 ### Authentication & Authorization
+
 - JWT-based authentication with access tokens
 - Role-based access control (RBAC) with 4 roles: BUYER, SELLER, ADMIN, SUPERADMIN
 - Field-level permission filtering per role per operation
@@ -22,6 +24,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 ### Roles & Permissions
 
 #### BUYER
+
 - Default role assigned on registration
 - Can browse products (read-only, limited fields)
 - Can browse categories (read-only)
@@ -37,6 +40,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Cannot manage other users
 
 #### SELLER
+
 - Opt-in via `/api/v1/users/become-seller` (blocked if already seller or account deactivated)
 - Can create **listings** via `POST /api/v1/seller-products/` (own only, auto-assigned to their user_id). A listing carries the seller's own price/stock/status/sku/title/images and references a shared catalog product. If the catalog product does not exist yet it is created automatically (find-or-create by barcode) — sellers do not touch the catalog `products` table directly
 - Can update own listings (title, stock, price, sku) via `PUT /api/v1/seller-products/<id>`
@@ -53,6 +57,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Cannot hard-delete anything except own uploaded images.
 
 #### ADMIN
+
 - Can create, read, update, and soft-delete categories
 - When deleting categories, associated `category_items` junction records are also deleted (no orphan relations)
 - Can create, read, update, and soft-delete **catalog products** (the shared spec) via `/api/v1/products/`
@@ -67,6 +72,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Cannot create uploads
 
 #### SUPERADMIN
+
 - Full CRUD on all resources: `users`, `products` (catalog), `seller_products` (listings), `orders`, `address`, `profile` and junction tables `order_items`, `category_items`
 - Can hard-delete any resource (permanent removal from database)
 - Can create catalog products / listings / orders on behalf of other users
@@ -75,6 +81,7 @@ RevoShop is an intuitive e-commerce ecosystem that simplifies online transaction
 - Is the only role that can grant the `SUPERADMIN` role to another user
 
 ### Orders & Cart
+
 - Orders created with `PENDING` status (acts as cart — stock not deducted, address can be null). Each order item references a specific seller **listing** (`seller_product_id`), so the exact seller and price bought are preserved
 - Only listings with status `ACTIVE` (not soft-deleted, whose catalog product is not soft-deleted) can be added to an order or paid for. Adding or paying for a non-`ACTIVE` listing (e.g. `INACTIVE`, `SUSPENDED`, `PENDING`, `REJECTED`) returns 400 with a generic "unavailable" message
 - Payment endpoint (`/api/v1/payment`) processes the order:
@@ -104,6 +111,7 @@ item at their own price:
   (`UNIQUE(product_id, user_id)`).
 
 #### Creating a listing (seller submits catalog + offer together)
+
 - `POST /api/v1/seller-products/` takes both catalog fields and listing fields. The
   service **find-or-creates** the catalog product: if a non-deleted product with the
   same `barcode` exists it is reused, otherwise a new catalog row is created. When no
@@ -112,13 +120,15 @@ item at their own price:
   admin approves it before it becomes buyer-visible.
 
 #### Listing status lifecycle
+
 Status lives on the **listing** (`seller_products.status`): `PENDING` | `ACTIVE` |
 `INACTIVE` | `SUSPENDED` | `REJECTED`.
-  - `PENDING`: newly created by a seller, awaiting admin review. Not publicly visible.
-  - `ACTIVE`: approved and publicly visible / purchasable.
-  - `INACTIVE`: temporarily hidden by the seller (out of stock / supply issue).
-  - `SUSPENDED`: hidden by an admin due to an issue.
-  - `REJECTED`: admin rejected the pending listing; also soft-deleted. Terminal.
+
+- `PENDING`: newly created by a seller, awaiting admin review. Not publicly visible.
+- `ACTIVE`: approved and publicly visible / purchasable.
+- `INACTIVE`: temporarily hidden by the seller (out of stock / supply issue).
+- `SUSPENDED`: hidden by an admin due to an issue.
+- `REJECTED`: admin rejected the pending listing; also soft-deleted. Terminal.
 - Status transition matrix (enforced server-side; invalid transitions return 400):
   - SELLER (owner only): `ACTIVE → INACTIVE`, `INACTIVE → ACTIVE`
   - ADMIN / SUPERADMIN: `PENDING → ACTIVE`, `PENDING → REJECTED`, `ACTIVE → SUSPENDED`, `SUSPENDED → ACTIVE`, `ACTIVE → INACTIVE`, `INACTIVE → ACTIVE`
@@ -126,9 +136,11 @@ Status lives on the **listing** (`seller_products.status`): `PENDING` | `ACTIVE`
 - Status changes go through `PUT /api/v1/seller-products/<id>` (the `status` field is validated against the matrix based on caller role + ownership); there is no separate status endpoint.
 
 #### Purchasability & the two-gate rule
+
 A listing is purchasable only when its `status = ACTIVE` **and** its own `deleted_at IS NULL`
 **and** its catalog product's `deleted_at IS NULL`. Adding or paying for anything else
 returns 400 "unavailable".
+
 - Setting a listing to `INACTIVE` or `SUSPENDED` is always allowed and takes effect
   immediately. Its two effects:
   1. New sales stop instantly — the purchase gate rejects add/pay for a non-`ACTIVE` listing.
@@ -142,11 +154,13 @@ returns 400 "unavailable".
 - Rejecting a listing (`PENDING → REJECTED`) sets both `status = REJECTED` and `deleted_at`.
 
 #### Deletion guards
+
 - Deleting a listing (`DELETE /api/v1/seller-products/<id>`) is blocked when it is linked
   to active `PAID` orders (409). Deleting a catalog product (`DELETE /api/v1/products/<id>`)
   is blocked when any of its listings is linked to a `PAID` order.
 
 #### Browse / visibility
+
 - `GET /api/v1/seller-products/` (public) is the storefront: it returns every `ACTIVE`,
   in-stock listing whose catalog product is live, each row joined to its catalog spec and
   tagged with `min_price` (the cheapest price across all listings of that same catalog
@@ -169,16 +183,19 @@ returns 400 "unavailable".
   `category_name`, `sort` (`name`/`created_at`), plus `page`/`per_page`.
 
 ### Orders
+
 - Cannot be deleted when order has `PAID` in status
-- Paid orders should be refunded when 
+- Paid orders should be refunded when
 
 ### Categories
+
 - Only ADMIN and SUPERADMIN can create/update/delete categories
 - Seller and Buyer have read-only access
 - When deleting a category, associated `category_items` junction records are also deleted (no orphan relations)
 - Query params on `GET /api/v1/categories/`: `search` (name, case-insensitive), `sort` (`name`/`created_at`, prefix `-` for descending), plus `page`/`per_page`
 
 ### Users & Profiles
+
 - Seller cannot be soft-deleted when they have active orders with `PAID` status
 - Seller cannot order their own listings
 - Privilege-escalation guard: only a superadmin can grant the `SUPERADMIN` role (admin attempts return 403)
@@ -188,17 +205,20 @@ returns 400 "unavailable".
 - Query params on `GET /api/v1/users/`: `search` (username or email, case-insensitive), `sort` (`username`/`created_at`, prefix `-` for descending), plus `page`/`per_page`. Privileged filters `role` and `is_active` are honored only for ADMIN/SUPERADMIN and silently ignored for other roles
 
 ### Stock Management
+
 - Stock deducted only upon successful payment (not on order creation)
 - Stock restored on order cancellation or deletion of PAID orders
 - DB-level constraint prevents negative stock
 
 ### Uploads
+
 - Listing image upload with ownership enforcement (resource `seller_products`, images stored on the listing)
 - Admin/Superadmin bypass ownership for image management
 - Seller can only manage images for own listings
 - Buyer cannot upload
 
 ### Logging
+
 - Environment-aware logging driven by `FLASK_ENV` (`local`, `development`, `production`)
 - **local:** all logs (DEBUG and up) to the console, no file
 - **development / production:** console output plus an ERROR-only log file for efficiency
@@ -206,6 +226,7 @@ returns 400 "unavailable".
 - Optional overrides: `LOG_LEVEL`, `LOG_DIR`, `LOG_BACKUP_DAYS`
 
 ### Platform-Wide
+
 - Role-based access control (RBAC) with field-level permission filtering
 - XSS protection via nh3 HTML sanitization on all inputs
 - Gmail alias normalization prevents duplicate accounts
@@ -216,26 +237,38 @@ returns 400 "unavailable".
 - Phone validation in +62 international format
 - Health check endpoint (`/health`) reporting app and database status
 
+### Frontend Integration & Infrastructure
+
+- CORS configured for the frontend origin (`FRONTEND_BASE_URL`, defaults to `http://localhost:3000`), allowing `GET`/`POST`/`PUT`/`DELETE`/`OPTIONS` with `Content-Type` and `Authorization` headers
+- Front-line per-IP rate limiter (500ms minimum interval between requests) to protect against bursty/bot traffic. Toggle with `RATE_LIMIT_ENABLED` (`true`/`false`); skips `OPTIONS` preflight and the test suite
+- Email confirmation token expiry shortened to 15 minutes
+- Listing detail (`GET /api/v1/seller-products/<id>`) now returns the catalog `description` and a human-readable `seller_name` alongside the raw ids
+
+### Admin Dashboard
+
+- `GET /api/v1/admin/dashboard` (ADMIN/SUPERADMIN) returns platform KPIs (users, listings, pending listings, orders today, GMV) plus chart series (orders/revenue over time, orders by status, users by role)
+- `days` query param sets the time-series window (default 30, range 1–365)
 
 ## Tech Stack
 
-- *Core Backend & Framework*
-    - **Language:** Python 3.13.7
-    - **Framework:** Flask 3.0
-    - **Configuration:** python-dotenv
-- *Database & ORM*
-    - **Database Engine:** PostgreSQL 16
-    - **ORM:** SQLAlchemy (Flask-SQLAlchemy)
-    - **Migrations:** Flask-Migrate
-    - **Database Management:** Dbeaver 22.0.2
-- *Testing & Performance*
-    - **Unit & Integration Testing:** pytest + pytest-flask
-    - **Load & Performance Testing:** Locust
-- *Production & Deployment*
-    - **WSGI HTTP Server:** gunicorn
-    - **Deployment Platform:** AWS
+- _Core Backend & Framework_
+  - **Language:** Python 3.13.7
+  - **Framework:** Flask 3.0
+  - **Configuration:** python-dotenv
+- _Database & ORM_
+  - **Database Engine:** PostgreSQL 16
+  - **ORM:** SQLAlchemy (Flask-SQLAlchemy)
+  - **Migrations:** Flask-Migrate
+  - **Database Management:** Dbeaver 22.0.2
+- _Testing & Performance_
+  - **Unit & Integration Testing:** pytest + pytest-flask
+  - **Load & Performance Testing:** Locust
+- _Production & Deployment_
+  - **WSGI HTTP Server:** gunicorn
+  - **Deployment Platform:** AWS
 
 ## Prerequisites
+
 - Python 3.13.7 or higher
 - PostgreSQL running locally (or a connection string to a remote instance)
 - pip and virtualenv
@@ -246,9 +279,8 @@ returns 400 "unavailable".
 
 ## 🔁 Route Handling flow (Flask-Smorest + SQLAlchemy)
 
-Below graph is the data flow (Request & Response) from when the client hit the API to 
+Below graph is the data flow (Request & Response) from when the client hit the API to
 the state when exchanging data with PostgreSql
-
 
 ```mermaid
 
@@ -263,38 +295,42 @@ graph TD
     E <--> H[(PostgreSQL Database)]
 
     %% 🎨 dark and light theme strategy (VS CODE & GITHUB ALL OK)
-    
-    classDef pink fill:#be6057,stroke:#e0847d,color:#ffffff,stroke-width:2px;
-    
-    classDef green fill:#2e7d32,stroke:#4caf50,color:#ffffff,stroke-width:2px;
-    
-    classDef blue fill:#0969da,stroke:#58a6ff,color:#ffffff,stroke-width:2px;
-    
-    classDef gray fill:#4a5568,stroke:#718096,color:#ffffff,stroke-width:1px;
 
-    %% Applied the color class to each element 
-    class A pink;       
-    class C green;      
-    class D blue;     
-    class E,H gray;     
+    classDef pink fill:#be6057,stroke:#e0847d,color:#ffffff,storeWidth:2px;
+
+    classDef green fill:#2e7d32,stroke:#4caf50,color:#ffffff,storeWidth:2px;
+
+    classDef blue fill:#0969da,stroke:#58a6ff,color:#ffffff,storeWidth:2px;
+
+    classDef gray fill:#4a5568,stroke:#718096,color:#ffffff,storeWidth:1px;
+
+    %% Applied the color class to each element
+    class A pink;
+    class C green;
+    class D blue;
+    class E,H gray;
 ```
+
 ## 🔁 migration flow (Flask-migrate + alembic)
+
 model -> flask alchemy-> flask migrate-> alembic -> sqlalchemy core
 
 ### 📋 Task & Responsibility
 
-| Layer Component | File location | Library | Main Task |
-| :--- | :--- | :--- | :--- |
-| **Smorest API Gate** | `app/routes/v1/*.py` | flask-smorest | Managing Routes, HTTP methods (`GET`/`POST`), and Swagger UI Documentation. |
-| **Validation Schema** | `app/schemas/*.py` | marshmallow_sqlalchemy<br>marshmallow | validate input data type, filtering output data, and storing custom error message. |
-| **Data Model & Property** | `app/models/*.py` | flask<br>flask_sqlalchemy<br>sqlachemy | define database table and storing virtual attribute (exp: raw password for *hashing*)|
-| **Business Logic Service** | `app/services/*.py` | flask | Handle all the business related logic and execution to database. |
-| **Manage database migration** | `app/migration/*.py` | flask<br>flask_sqlalchemy<br>sqlachemy | Handle all the database upgrade and downgrade the database. |
-
+| Layer Component               | File location        | Library                                | Main Task                                                                             |
+| :---------------------------- | :------------------- | :------------------------------------- | :------------------------------------------------------------------------------------ |
+| **Smorest API Gate**          | `app/routes/v1/*.py` | flask-smorest                          | Managing Routes, HTTP methods (`GET`/`POST`), and Swagger UI Documentation.           |
+| **Validation Schema**         | `app/schemas/*.py`   | marshmallow_sqlalchemy<br>marshmallow  | validate input data type, filtering output data, and storing custom error message.    |
+| **Data Model & Property**     | `app/models/*.py`    | flask<br>flask_sqlalchemy<br>sqlachemy | define database table and storing virtual attribute (exp: raw password for _hashing_) |
+| **Business Logic Service**    | `app/services/*.py`  | flask                                  | Handle all the business related logic and execution to database.                      |
+| **Manage database migration** | `app/migration/*.py` | flask<br>flask_sqlalchemy<br>sqlachemy | Handle all the database upgrade and downgrade the database.                           |
 
 ## Installation
+
 ### 1. Clone & Setup Environment
-Clone repositori, buat dan aktifkan *virtual environment*, serta install dependencies:
+
+Clone repositori, buat dan aktifkan _virtual environment_, serta install dependencies:
+
 ```bash
 git clone https://github.com
 cd module-2-miftahalrasyid
@@ -308,8 +344,10 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
-### install postgresql 
+### install postgresql
+
 Skip install if you already have postgresql
+
 ```bash
 brew install postgresql
 brew services start postgresql
@@ -321,16 +359,22 @@ CREATE ROLE postgres WITH LOGIN SUPERUSER PASSWORD 'password';
 # quit postgres
 \q
 ```
+
 ### 2. Configure Local PostgreSQL Database
+
 Buat database baru di PostgreSQL:
+
 ```bash
 # create revoshop_db
 createdb -U postgres revoshop_db
 ```
-*(Alternatif via psql: `psql -U postgres`, lalu ketik `CREATE DATABASE revoshop_db;` dan `\q`).*
+
+_(Alternatif via psql: `psql -U postgres`, lalu ketik `CREATE DATABASE revoshop_db;` dan `\q`)._
 
 ### 3. Setup Environment Variables (.env)
+
 Buat file `.env` di root direktori:
+
 ```env
 SQLALCHEMY_DATABASE_URI=postgresql://postgres:your_password@localhost:5432/revoshop_db
 secrets; print(secrets.token_hex(32))")
@@ -348,18 +392,22 @@ CURRENCY=IDR
 ```
 
 ### 4. Database Migration, & Seeding
-run migrations and *seeding*:
+
+run migrations and _seeding_:
+
 ```bash
 flask db upgrade
 PYTHONPATH=. python seeds/initial_seed.py
 ```
 
 ## Testing
+
 Tests use a separate PostgreSQL database (auto-created as `{your_db_name}_test`). Your production data is never touched.
 
 **Current status:** 304 tests passing · 85% code coverage
 
 ### Unit & Integration Tests
+
 ```bash
 # Run all tests with coverage
 pytest tests/ --cov=app --cov-report=term-missing
@@ -371,6 +419,7 @@ pytest tests/routes/v1/test_category_routes.py -v
 Prerequisites: PostgreSQL running + `.env` configured. The test database is auto-created on first run.
 
 ### Load Testing (Locust)
+
 ```bash
 # Start the dev server first
 flask run --debug --port=8000
@@ -384,6 +433,7 @@ Open `http://localhost:8089` in your browser, set the number of users and spawn 
 ![Locust Load Test Results](docs/screenshots/locust-results.png)
 
 ### Security Audit
+
 `audit.sh` runs a suite of security checks. It's report-friendly locally (missing tools produce warnings, not errors) and runs automatically in CI before Swagger deployment (a failed audit blocks the deploy).
 
 ```bash
@@ -396,6 +446,7 @@ brew install gitleaks   # macOS
 ```
 
 What it checks:
+
 - **Secrets** — scans for hardcoded credentials, API keys, tokens, and private keys (`gitleaks`, with a `grep` fallback)
 - **Dependencies** — flags known CVEs in `requirements.txt` (`pip-audit`)
 - **Static analysis** — detects insecure code patterns in `app/` (`bandit`)
@@ -404,10 +455,13 @@ What it checks:
 Exit code is `0` if all critical checks pass, `1` otherwise.
 
 ## Usage
+
 Start the development server:
+
 ```bash
 flask run --debug --port=8000
 ```
+
 The API will be available at `http://localhost:8000`.
 
 ### Payments (Midtrans) — expose the webhook with ngrok
@@ -418,6 +472,7 @@ Midtrans cannot reach `localhost`, you must expose your local server with a tunn
 during development. **If ngrok is not running, payments will never settle locally.**
 
 Run these in two terminals (both must stay open):
+
 ```bash
 # terminal 1 — the API
 flask run --debug --port=8000
@@ -425,11 +480,14 @@ flask run --debug --port=8000
 # terminal 2 — public tunnel to port 8000
 ./ngrok_tunnel.sh        # or: ngrok http 8000
 ```
+
 ngrok prints a public HTTPS URL (e.g. `https://abc123.ngrok-free.app`). Put it in the
 Midtrans dashboard under **Settings → Configuration → Payment Notification URL** as:
+
 ```
 https://<your-ngrok-subdomain>.ngrok-free.app/api/v1/payment/notification
 ```
+
 The free ngrok URL changes on every restart, so re-paste it each session. First-time
 setup requires `ngrok config add-authtoken <YOUR_NGROK_AUTHTOKEN>`.
 
@@ -439,16 +497,19 @@ Full buyer/seller walkthrough, refund flow, and the dev-vs-production switch-ove
 ### Example Requests
 
 **Get all products:**
+
 ```bash
 curl http://localhost:8000/api/v1/products/
 ```
 
 **Get a single product:**
+
 ```bash
 curl http://localhost:8000/api/v1/products/1
 ```
 
 **Login (get token):**
+
 ```bash
 curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
@@ -456,11 +517,13 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 ```
 
 **Browse listings (public storefront):**
+
 ```bash
 curl "http://localhost:8000/api/v1/seller-products/?search=mouse"
 ```
 
 **Create a listing (requires seller/admin token; find-or-creates the catalog product, starts PENDING):**
+
 ```bash
 curl -X POST http://localhost:8000/api/v1/seller-products/ \
   -H "Authorization: Bearer <your-token>" \
@@ -469,6 +532,7 @@ curl -X POST http://localhost:8000/api/v1/seller-products/ \
 ```
 
 **Update a listing (price/stock, or status transition):**
+
 ```bash
 curl -X PUT http://localhost:8000/api/v1/seller-products/1 \
   -H "Authorization: Bearer <your-token>" \
@@ -477,6 +541,7 @@ curl -X PUT http://localhost:8000/api/v1/seller-products/1 \
 ```
 
 **Approve a listing (admin: PENDING -> ACTIVE):**
+
 ```bash
 curl -X PUT http://localhost:8000/api/v1/seller-products/1 \
   -H "Authorization: Bearer <admin-token>" \
@@ -485,6 +550,7 @@ curl -X PUT http://localhost:8000/api/v1/seller-products/1 \
 ```
 
 **Delete a listing (soft delete):**
+
 ```bash
 curl -X DELETE http://localhost:8000/api/v1/seller-products/1 \
   -H "Authorization: Bearer <your-token>" \
@@ -508,6 +574,7 @@ Access Swagger UI documentation on **[http://localhost:8000/swagger-ui](http://l
 ## Seeding Objective
 
 Populate the database with realistic data for development and testing:
+
 - 32 users (1 superadmin, 1 admin, 5 sellers, 23 buyers, 2 inactive)
 - 32 profiles with bios
 - 31 addresses across Indonesia
@@ -521,33 +588,34 @@ Populate the database with realistic data for development and testing:
 All seeded users use password: `Password1234`
 
 ### Key Accounts
-| Role | Email |
-|------|-------|
-| Superadmin | funnyclown1112@gmail.com |
-| Admin | mike@gmail.com |
-| Seller | justin@gmail.com, arini@gmail.com |
-| Buyer | budi@gmail.com, siti.nurhaliza@gmail.com |
 
-## Step-by-Step Guide: Implementing HTML Request Features in Isolation 
->Creating new feature (endpoint: GET,POST) steps using (Flask-Smorest x marsmallow x flask-sqlalchemy x marsmallow-sqlalchemy) route stack
+| Role       | Email                                    |
+| ---------- | ---------------------------------------- |
+| Superadmin | funnyclown1112@gmail.com                 |
+| Admin      | mike@gmail.com                           |
+| Seller     | justin@gmail.com, arini@gmail.com        |
+| Buyer      | budi@gmail.com, siti.nurhaliza@gmail.com |
 
+## Step-by-Step Guide: Implementing HTML Request Features in Isolation
+
+> Creating new feature (endpoint: GET,POST) steps using (Flask-Smorest x marsmallow x flask-sqlalchemy x marsmallow-sqlalchemy) route stack
 
 ```mermaid
 flowchart TD
     %% Struktur luar diatur TD (Top-Down) agar kelompok Flask berada di bawah
-    %% classDef step fill:#2d3748,stroke:#4a5568,stroke-width:2px,color:#fff;
-    classDef pink fill:#be6057,stroke:#e0847d,color:#ffffff,stroke-width:2px;
+    %% classDef step fill:#2d3748,stroke:#4a5568,storeWidth:2px,color:#fff;
+    classDef pink fill:#be6057,stroke:#e0847d,color:#ffffff,storeWidth:2px;
 
     subgraph Isolation_Layer ["Isolation Layer"]
         direction LR
         B["<b>1. schemas.py</b><br>Map Models Column to Marshmallow"]:::step
-        --> A["<b>2. models.py</b><br>Create SQLAlchemy Models"]:::step 
+        --> A["<b>2. models.py</b><br>Create SQLAlchemy Models"]:::step
         --> C["<b>3. services.py</b><br>Write Pure Business Logic"]:::step
     end
 
     subgraph Flask_Registration ["Flask Registration"]
         direction LR
-        D["<b>4. routes.py</b><br>Connect HTTP Routes to Services"]:::step 
+        D["<b>4. routes.py</b><br>Connect HTTP Routes to Services"]:::step
         --> E["<b>5. __init__.py (App Factory)</b><br>Register Blueprints to Core API"]:::step
     end
 
@@ -556,8 +624,8 @@ flowchart TD
 
     %% Subgraph styling
 
-    %% style Isolation_Layer fill:#202632,stroke:#4a5568,stroke-width:1px
-    %% style Flask_Registration fill:#1a202c,stroke:#4a5568,stroke-width:1px
+    %% style Isolation_Layer fill:#202632,stroke:#4a5568,storeWidth:1px
+    %% style Flask_Registration fill:#1a202c,stroke:#4a5568,storeWidth:1px
 
 ```
 
@@ -731,7 +799,6 @@ flowchart TD
     └── products/
 ```
 
-
 ## API Reference
 
 Github Pages Swagger documentation available at **[https://revou-fsse-jun26.github.io/module-2-miftahalrasyid/](https://revou-fsse-jun26.github.io/module-2-miftahalrasyid/)**
@@ -740,129 +807,135 @@ Full interactive documentation available online at **[https://module-2-miftahalr
 
 ### Auth
 
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :---: |
-| `POST` | `/api/v1/auth/register` | Register new user | - |
-| `POST` | `/api/v1/auth/login` | Login and get JWT | - |
-| `POST` | `/api/v1/auth/oauth/google` | Google OAuth login | - |
-| `GET` | `/api/v1/auth/email_confirmation` | Verify email | - |
+| Method | Endpoint                          | Description        | Auth |
+| :----- | :-------------------------------- | :----------------- | :--: |
+| `POST` | `/api/v1/auth/register`           | Register new user  |  -   |
+| `POST` | `/api/v1/auth/login`              | Login and get JWT  |  -   |
+| `POST` | `/api/v1/auth/oauth/google`       | Google OAuth login |  -   |
+| `GET`  | `/api/v1/auth/email_confirmation` | Verify email       |  -   |
 
 ### Users
 
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :---: |
-| `GET` | `/api/v1/users/` | List users | Bearer |
-| `POST` | `/api/v1/users/` | Create user | Bearer |
-| `GET` | `/api/v1/users/<id>` | Get user | Bearer |
-| `PUT` | `/api/v1/users/<id>` | Update user | Bearer |
-| `DELETE` | `/api/v1/users/<id>` | Delete user | Bearer |
-| `GET` | `/api/v1/users/me` | Get own profile | Bearer |
-| `PUT` | `/api/v1/users/me/profile` | Update own profile | Bearer |
-| `POST` | `/api/v1/users/become-seller` | Become seller | Bearer |
-| `GET` | `/api/v1/users/me/addresses` | List addresses | Bearer |
-| `POST` | `/api/v1/users/me/addresses` | Create address | Bearer |
-| `GET` | `/api/v1/users/me/addresses/<id>` | Get address | Bearer |
-| `PUT` | `/api/v1/users/me/addresses/<id>` | Update address | Bearer |
-| `DELETE` | `/api/v1/users/me/addresses/<id>` | Delete address | Bearer |
+| Method   | Endpoint                          | Description        |  Auth  |
+| :------- | :-------------------------------- | :----------------- | :----: |
+| `GET`    | `/api/v1/users/`                  | List users         | Bearer |
+| `POST`   | `/api/v1/users/`                  | Create user        | Bearer |
+| `GET`    | `/api/v1/users/<id>`              | Get user           | Bearer |
+| `PUT`    | `/api/v1/users/<id>`              | Update user        | Bearer |
+| `DELETE` | `/api/v1/users/<id>`              | Delete user        | Bearer |
+| `GET`    | `/api/v1/users/me`                | Get own profile    | Bearer |
+| `PUT`    | `/api/v1/users/me/profile`        | Update own profile | Bearer |
+| `POST`   | `/api/v1/users/become-seller`     | Become seller      | Bearer |
+| `GET`    | `/api/v1/users/me/addresses`      | List addresses     | Bearer |
+| `POST`   | `/api/v1/users/me/addresses`      | Create address     | Bearer |
+| `GET`    | `/api/v1/users/me/addresses/<id>` | Get address        | Bearer |
+| `PUT`    | `/api/v1/users/me/addresses/<id>` | Update address     | Bearer |
+| `DELETE` | `/api/v1/users/me/addresses/<id>` | Delete address     | Bearer |
 
 ### Products (catalog)
 
 Catalog products are the shared spec. Reads are public; writes are ADMIN/SUPERADMIN only.
 
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :---: |
-| `GET` | `/api/v1/products/` | List catalog products (with active listings) | - |
-| `POST` | `/api/v1/products/` | Create catalog product (admin/superadmin) | Bearer |
-| `GET` | `/api/v1/products/<id>` | Get catalog product | - |
-| `PUT` | `/api/v1/products/<id>` | Update catalog product (admin/superadmin) | Bearer |
-| `DELETE` | `/api/v1/products/<id>` | Delete catalog product (admin/superadmin) | Bearer |
+| Method   | Endpoint                | Description                                  |  Auth  |
+| :------- | :---------------------- | :------------------------------------------- | :----: |
+| `GET`    | `/api/v1/products/`     | List catalog products (with active listings) |   -    |
+| `POST`   | `/api/v1/products/`     | Create catalog product (admin/superadmin)    | Bearer |
+| `GET`    | `/api/v1/products/<id>` | Get catalog product                          |   -    |
+| `PUT`    | `/api/v1/products/<id>` | Update catalog product (admin/superadmin)    | Bearer |
+| `DELETE` | `/api/v1/products/<id>` | Delete catalog product (admin/superadmin)    | Bearer |
 
 ### Seller Products (listings)
 
 A seller's per-offer listing (price/stock/status/title/images) referencing a catalog product.
 
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :---: |
-| `GET` | `/api/v1/seller-products/` | Browse listings (public storefront, tagged with `min_price`) | - |
-| `POST` | `/api/v1/seller-products/` | Create a listing (find-or-creates catalog; starts `PENDING`) | Bearer |
-| `GET` | `/api/v1/seller-products/mine` | List the caller's own listings (any status) | Bearer |
-| `GET` | `/api/v1/seller-products/<id>` | Get a listing | - |
-| `PUT` | `/api/v1/seller-products/<id>` | Update listing / status transition (seller or admin) | Bearer |
-| `DELETE` | `/api/v1/seller-products/<id>` | Delete a listing (own, or admin) | Bearer |
+| Method   | Endpoint                       | Description                                                  |  Auth  |
+| :------- | :----------------------------- | :----------------------------------------------------------- | :----: |
+| `GET`    | `/api/v1/seller-products/`     | Browse listings (public storefront, tagged with `min_price`) |   -    |
+| `POST`   | `/api/v1/seller-products/`     | Create a listing (find-or-creates catalog; starts `PENDING`) | Bearer |
+| `GET`    | `/api/v1/seller-products/mine` | List the caller's own listings (any status)                  | Bearer |
+| `GET`    | `/api/v1/seller-products/<id>` | Get a listing                                                |   -    |
+| `PUT`    | `/api/v1/seller-products/<id>` | Update listing / status transition (seller or admin)         | Bearer |
+| `DELETE` | `/api/v1/seller-products/<id>` | Delete a listing (own, or admin)                             | Bearer |
 
 ### Categories
 
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :---: |
-| `GET` | `/api/v1/categories/` | List categories | - |
-| `POST` | `/api/v1/categories/` | Create category | Bearer |
-| `GET` | `/api/v1/categories/<id>` | Get category | - |
-| `PUT` | `/api/v1/categories/<id>` | Update category | Bearer |
+| Method   | Endpoint                  | Description     |  Auth  |
+| :------- | :------------------------ | :-------------- | :----: |
+| `GET`    | `/api/v1/categories/`     | List categories |   -    |
+| `POST`   | `/api/v1/categories/`     | Create category | Bearer |
+| `GET`    | `/api/v1/categories/<id>` | Get category    |   -    |
+| `PUT`    | `/api/v1/categories/<id>` | Update category | Bearer |
 | `DELETE` | `/api/v1/categories/<id>` | Delete category | Bearer |
 
 ### Orders
 
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :---: |
-| `GET` | `/api/v1/orders/` | List orders | Bearer |
-| `POST` | `/api/v1/orders/` | Create order | Bearer |
-| `GET` | `/api/v1/orders/<id>` | Get order | Bearer |
-| `PUT` | `/api/v1/orders/<id>` | Update order status | Bearer |
-| `DELETE` | `/api/v1/orders/<id>` | Delete order | Bearer |
-| `GET` | `/api/v1/orders/<id>/products` | Products in order | Bearer |
+| Method   | Endpoint                       | Description         |  Auth  |
+| :------- | :----------------------------- | :------------------ | :----: |
+| `GET`    | `/api/v1/orders/`              | List orders         | Bearer |
+| `POST`   | `/api/v1/orders/`              | Create order        | Bearer |
+| `GET`    | `/api/v1/orders/<id>`          | Get order           | Bearer |
+| `PUT`    | `/api/v1/orders/<id>`          | Update order status | Bearer |
+| `DELETE` | `/api/v1/orders/<id>`          | Delete order        | Bearer |
+| `GET`    | `/api/v1/orders/<id>/products` | Products in order   | Bearer |
 
 ### Payment
 
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :---: |
-| `POST` | `/api/v1/payment/` | Initiate Midtrans Snap payment for a PENDING order (returns snap_token + redirect_url) | Bearer |
-| `POST` | `/api/v1/payment/notification` | Midtrans webhook — settlement transitions order to PAID. Called by Midtrans, not the client | - |
+| Method | Endpoint                       | Description                                                                                 |  Auth  |
+| :----- | :----------------------------- | :------------------------------------------------------------------------------------------ | :----: |
+| `POST` | `/api/v1/payment/`             | Initiate Midtrans Snap payment for a PENDING order (returns snap_token + redirect_url)      | Bearer |
+| `POST` | `/api/v1/payment/notification` | Midtrans webhook — settlement transitions order to PAID. Called by Midtrans, not the client |   -    |
 
 > Local development requires an ngrok tunnel so Midtrans can reach the webhook — see [Payments (Midtrans)](#payments-midtrans--expose-the-webhook-with-ngrok) under Usage and [payment_steps_with_midtrans.md](./payment_steps_with_midtrans.md).
 
 ### Uploads
 
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :---: |
-| `POST` | `/api/v1/uploads/` | Upload image | Bearer |
+| Method   | Endpoint           | Description  |  Auth  |
+| :------- | :----------------- | :----------- | :----: |
+| `POST`   | `/api/v1/uploads/` | Upload image | Bearer |
 | `DELETE` | `/api/v1/uploads/` | Delete image | Bearer |
 
 ### Admin
 
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :---: |
-| `GET` | `/api/v1/admin/products` | All products (inc. deleted/inactive) | Bearer |
-| `GET` | `/api/v1/admin/users/<id>/orders` | User's order history | Bearer |
-| `GET` | `/api/v1/admin/orders/<id>/products` | Products in any order | Bearer |
+| Method | Endpoint                             | Description                          |  Auth  |
+| :----- | :----------------------------------- | :----------------------------------- | :----: |
+| `GET`  | `/api/v1/admin/products`             | All products (inc. deleted/inactive) | Bearer |
+| `GET`  | `/api/v1/admin/users/<id>/orders`    | User's order history                 | Bearer |
+| `GET`  | `/api/v1/admin/orders/<id>/products` | Products in any order                | Bearer |
 
 ### System
 
 Infrastructure endpoints (not versioned, not in Swagger).
 
-| Method | Endpoint | Description | Auth |
-| :--- | :--- | :--- | :---: |
-| `GET` | `/api` | API root — returns name, version, and links | - |
-| `GET` | `/health` | Health check (app + database status) | - |
-| `GET` | `/uploads/<filepath>` | Serve uploaded image file | - |
+| Method | Endpoint              | Description                                 | Auth |
+| :----- | :-------------------- | :------------------------------------------ | :--: |
+| `GET`  | `/api`                | API root — returns name, version, and links |  -   |
+| `GET`  | `/health`             | Health check (app + database status)        |  -   |
+| `GET`  | `/uploads/<filepath>` | Serve uploaded image file                   |  -   |
 
 ### Postman Examples
 
 #### GET
+
 ![GET Request](docs/screenshots/postman-get.png)
 
 #### POST
+
 ![POST Request](docs/screenshots/postman-post.png)
 
 #### PUT
+
 ![PUT Request](docs/screenshots/postman-put.png)
 
 #### DELETE
+
 ![DELETE Request](docs/screenshots/postman-delete.png)
 
 > All protected endpoints require a Bearer token in the `Authorization` header. Obtain a token via `POST /api/v1/auth/login` or `POST /api/v1/auth/register`.
 
 ## Contributing
-Read [CONTRIBUTING.md](./CONTRIBUTING.md) for our pull request process, coding standards, and commit message format.
-## License
-[MIT](./LICENSE) © 2026 RevoShop Team
 
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) for our pull request process, coding standards, and commit message format.
+
+## License
+
+[MIT](./LICENSE) © 2026 RevoShop Team

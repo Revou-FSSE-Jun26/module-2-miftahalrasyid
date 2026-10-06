@@ -54,3 +54,4 @@ docs/seed.sql
 
 # === Local design/planning doc (work-in-progress, not pushed) ===
 seller_products_design.md
+task_management_frontend_spec.md
