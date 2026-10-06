@@ -37,6 +37,12 @@ def create_app():
     app.config['TAX_PERCENT'] = float(os.environ.get("TAX_PERCENT", 11))
     app.config['CURRENCY'] = os.environ.get("CURRENCY", "IDR")
 
+    # --- Rate limiter toggle (per-IP 500ms front-line limiter) ---
+    # Set RATE_LIMIT_ENABLED=false in the environment to turn it off without code changes.
+    app.config['RATE_LIMIT_ENABLED'] = (
+        os.environ.get("RATE_LIMIT_ENABLED", "true").lower() == "true"
+    )
+
     # --- Midtrans payment gateway ---
     app.config['MIDTRANS_SERVER_KEY'] = os.environ.get("MIDTRANS_SERVER_KEY")
     app.config['MIDTRANS_CLIENT_KEY'] = os.environ.get("MIDTRANS_CLIENT_KEY")
@@ -70,6 +76,11 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
+
+    # Front-line per-IP rate limiter (before_request). Skips OPTIONS + TESTING;
+    # toggle via RATE_LIMIT_ENABLED.
+    # from app.middleware import register_rate_limiter
+    # register_rate_limiter(app)
 
     # Initialize Smorest API
     api = Api(app)
