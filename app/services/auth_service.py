@@ -387,7 +387,7 @@ def generate_email_confirmation_token(user):
     token = create_access_token(
         identity=str(user.id),
         additional_claims={"purpose": "email_verification"},
-        expires_delta=timedelta(hours=24)
+        expires_delta=timedelta(minutes=15)
     )
     return token
 
