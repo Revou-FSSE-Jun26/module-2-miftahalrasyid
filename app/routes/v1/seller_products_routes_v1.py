@@ -136,10 +136,13 @@ class SellerProductDetail(MethodView):
             data.update({
                 "brand": listing.catalog.brand,
                 "name": listing.catalog.name,
+                "description": listing.catalog.description,
                 "model": listing.catalog.model,
                 "color": listing.catalog.color,
                 "size": listing.catalog.size,
             })
+        if listing.seller:
+            data["seller_name"] = listing.seller.username
         return jsonify({"success": True, "message": "get listing detail successful", "data": data}), 200
 
     @seller_products_bp.doc(security=[{"BearerAuth": []}], responses={
