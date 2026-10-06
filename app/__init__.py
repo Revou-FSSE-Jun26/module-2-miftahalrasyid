@@ -5,6 +5,7 @@ from flask_smorest import Api
 from dotenv import load_dotenv
 from app.extensions import db, migrate, jwt
 from app.utils.logger import setup_logging
+from flask_cors import CORS
 
 load_dotenv()
 
@@ -14,6 +15,16 @@ def create_app():
     setup_logging()
 
     app = Flask(__name__)
+    
+    frontend_url = os.environ.get("FRONTEND_BASE_URL", "http://localhost:3000")
+
+    # 2. Comprehensive CORS configuration
+    CORS(
+        app, 
+        origins=[frontend_url],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization"]
+    )
 
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ["SQLALCHEMY_DATABASE_URI"]
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
