@@ -196,3 +196,15 @@ class AdminOrderQueryArgs(PaginationQueryArgs):
         validate=ma.validate.OneOf(["total", "-total", "created_at", "-created_at"]),
         metadata={"description": "Sort field. Prefix with '-' for descending.", "example": "-created_at"},
     )
+
+
+class AdminDashboardQueryArgs(ma.Schema):
+    """Query args for GET /admin/dashboard — the time-series window."""
+    days = ma.fields.Int(
+        load_default=30,
+        validate=ma.validate.Range(min=1, max=365),
+        metadata={
+            "description": "Window (in days) for the orders/revenue time-series chart.",
+            "example": 30,
+        },
+    )

@@ -31,6 +31,7 @@ from .query_schema import (
     UserQueryArgs,
     AdminProductQueryArgs,
     AdminOrderQueryArgs,
+    AdminDashboardQueryArgs,
 )
 import marshmallow as ma
 from app.utils.sanitizer import SanitizeMixin
@@ -96,4 +97,5 @@ __all__ = [
     "UserQueryArgs",
     "AdminProductQueryArgs",
     "AdminOrderQueryArgs",
+    "AdminDashboardQueryArgs",
 ]

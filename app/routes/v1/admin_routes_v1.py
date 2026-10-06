@@ -7,7 +7,8 @@ from app.models.user_model import User
 from app.services.auth_service import roles_required
 from app.services.order_service import get_order_items
 from app.utils.pagination import paginate_query
-from app.schemas import AdminProductQueryArgs, AdminOrderQueryArgs
+from app.schemas import AdminProductQueryArgs, AdminOrderQueryArgs, AdminDashboardQueryArgs
+from app.services.dashboard_service import get_admin_dashboard
 from flask_jwt_extended import get_jwt
 from sqlalchemy import asc, desc
 
@@ -276,4 +277,30 @@ class AdminCategoryProducts(MethodView):
                 "per_page": result["per_page"],
                 "total": result["count"],
             }
+        }), 200
+
+
+@admin_bp.route('/dashboard')
+class AdminDashboard(MethodView):
+
+    @admin_bp.doc(security=[{"BearerAuth": []}], responses={
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+    })
+    @admin_bp.arguments(AdminDashboardQueryArgs, location="query")
+    @admin_bp.response(200)
+    @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    def get(self, query_args):
+        """Aggregated platform dashboard: KPIs + chart series (admin/superadmin only).
+
+        Returns headline KPIs (users, listings, pending listings, orders today, GMV)
+        and chart series (orders/revenue over time, orders by status, users by role).
+        The `days` query arg sets the time-series window (default 30).
+        """
+        data = get_admin_dashboard(days=query_args.get("days", 30))
+
+        return jsonify({
+            "success": True,
+            "message": "Admin dashboard metrics",
+            "data": data,
         }), 200
