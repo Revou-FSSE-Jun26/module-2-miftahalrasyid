@@ -140,6 +140,7 @@ class SellerProductDetail(MethodView):
                 "model": listing.catalog.model,
                 "color": listing.catalog.color,
                 "size": listing.catalog.size,
+                "categories": [c.name for c in listing.catalog.categories],
             })
         if listing.seller:
             data["seller_name"] = listing.seller.username
