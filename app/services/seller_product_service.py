@@ -194,7 +194,31 @@ def get_my_listings(filters=None, jwt_user_id=None, roles=None):
         if search:
             query = query.filter(SellerProduct.title.ilike(f"%{search}%"))
 
-        query = query.order_by(SellerProduct.id.asc())
+        # Sorting. Prefix '-' for descending. Defaults to newest first
+        # (-created_at), with id as a stable tie-breaker since seeded rows can
+        # share the same created_at.
+        sort = filters.get("sort")
+        sort_columns = {
+            "price": SellerProduct.price,
+            "title": SellerProduct.title,
+            "created_at": SellerProduct.created_at,
+            "id": SellerProduct.id,
+        }
+        if sort:
+            descending = sort.startswith("-")
+            column = sort_columns.get(sort.lstrip("-"))
+            if column is not None:
+                query = query.order_by(
+                    column.desc() if descending else column.asc(),
+                    SellerProduct.id.desc(),
+                )
+            else:
+                query = query.order_by(SellerProduct.id.desc())
+        else:
+            query = query.order_by(
+                SellerProduct.created_at.desc(), SellerProduct.id.desc()
+            )
+
         return paginate_query(query, args=filters)
     except Exception as e:
         logging.error(f"Failed to retrieve listings: {str(e)}")
