@@ -8,6 +8,7 @@ from .seller_product_schema import (
 )
 from .order_schema import OrderSchema, OrderUpdateSchema
 from .order_item_schema import OrderItemSchema, OrderErrorExamples, OrderUpdateSuccessResponseSchema
+from .cart_schema import CartItemAddSchema, CartItemUpdateSchema, CartItemSchema, CartQueryArgs
 from .category_schema import CategorySchema, CategoryUpdateSchema
 from .profile_schema import ProfileSchema, ProfileUpdateSchema
 from .address_schema import AddressSchema, AddressUpdateSchema
@@ -69,6 +70,10 @@ __all__ = [
     "OrderItemSchema",
     "OrderErrorExamples",
     "OrderUpdateSuccessResponseSchema",
+    "CartItemAddSchema",
+    "CartItemUpdateSchema",
+    "CartItemSchema",
+    "CartQueryArgs",
     "CategorySchema",
     "CategoryUpdateSchema",
     "DeleteActionSchema",

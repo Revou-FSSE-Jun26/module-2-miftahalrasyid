@@ -9,6 +9,7 @@ from app.services.user_service import get_all_users,add_new_users,get_user_by,up
 from app.services.product_service import get_all_products, create_new_product, update_product, get_product_by_id, delete_product
 from app.services.category_service import get_all_categories, get_category_by_id, create_category, update_category, delete_category
 from app.services.order_service import get_all_orders, get_order_by_id, create_order, update_order, delete_order, get_order_items
+from app.services.cart_service import get_cart, add_to_cart, update_cart_item, remove_cart_item, clear_cart
 # Daftarkan semua fungsi servis yang ingin Anda ekspos ke folder luar
 
 
@@ -35,4 +36,9 @@ __all__ = [
     'update_order',
     'delete_order',
     'get_order_items',
+    'get_cart',
+    'add_to_cart',
+    'update_cart_item',
+    'remove_cart_item',
+    'clear_cart',
 ]
