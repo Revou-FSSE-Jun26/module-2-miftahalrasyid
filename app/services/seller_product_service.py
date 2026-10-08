@@ -23,6 +23,7 @@ from app.models import (
     Product, SellerProduct, ProductStatus, UserRole,
 )
 from app.models.category_model import Category
+from app.models.order_items_model import Order_item
 from . import ValidationResponse
 
 
@@ -128,9 +129,29 @@ def browse_listings(filters=None, roles=None):
         }
         if sort:
             descending = sort.startswith("-")
-            column = sort_columns.get(sort.lstrip("-"))
-            if column is not None:
-                query = query.order_by(column.desc() if descending else column.asc())
+            key = sort.lstrip("-")
+            if key == "popular":
+                # Units sold per listing = SUM(order_items.quantity) for this
+                # listing, counting only live (non-deleted) order lines. Done as
+                # a correlated scalar subquery so it doesn't interfere with the
+                # existing min_price window or pagination count.
+                sold_count = (
+                    db.session.query(func.coalesce(func.sum(Order_item.quantity), 0))
+                    .filter(
+                        Order_item.seller_product_id == SellerProduct.id,
+                        Order_item.deleted_at.is_(None),
+                    )
+                    .correlate(SellerProduct)
+                    .scalar_subquery()
+                )
+                # Most popular first by default; '-popular' is the natural case.
+                order_expr = sold_count.asc() if not descending else sold_count.desc()
+                # Tie-break by price asc so results are stable.
+                query = query.order_by(order_expr, SellerProduct.price.asc())
+            else:
+                column = sort_columns.get(key)
+                if column is not None:
+                    query = query.order_by(column.desc() if descending else column.asc())
         else:
             query = query.order_by(SellerProduct.price.asc())
 

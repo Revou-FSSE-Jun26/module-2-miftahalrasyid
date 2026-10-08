@@ -99,9 +99,14 @@ class SellerProductQueryArgs(SanitizeMixin, PaginationQueryArgs):
     sort = ma.fields.Str(
         load_default=None,
         validate=ma.validate.OneOf(
-            ["price", "-price", "title", "-title", "created_at", "-created_at"]
+            [
+                "price", "-price",
+                "title", "-title",
+                "created_at", "-created_at",
+                "popular", "-popular",  # by total quantity sold (order_items)
+            ]
         ),
-        metadata={"description": "Sort field. Prefix with '-' for descending.", "example": "price"},
+        metadata={"description": "Sort field. Prefix with '-' for descending. 'popular' sorts by units sold.", "example": "-popular"},
     )
 
 
