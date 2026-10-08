@@ -64,6 +64,46 @@ def get_all_orders(jwt_user_id, roles, filters=None):
         return None
 
 
+def get_my_placed_orders(jwt_user_id, filters=None):
+    """
+    Orders the caller personally PLACED (as a buyer), i.e. Order.user_id == me,
+    regardless of the caller's role. This is distinct from get_all_orders, where
+    SELLER/ADMIN are widened to incoming/all orders. Used by GET /orders/mine so
+    a seller/admin can still see their own purchases.
+
+    Supports the same status/sort/pagination filters.
+    """
+    from app.utils.pagination import paginate_query
+    filters = filters or {}
+    try:
+        query = Order.query.filter(
+            Order.deleted_at.is_(None),
+            Order.user_id == int(jwt_user_id),
+        )
+
+        status = filters.get("status")
+        if status:
+            try:
+                query = query.filter(Order.status == OrderStatus(status))
+            except ValueError:
+                pass
+
+        sort = filters.get("sort")
+        sort_columns = {"total": Order.total, "created_at": Order.created_at}
+        if sort:
+            descending = sort.startswith("-")
+            column = sort_columns.get(sort.lstrip("-"))
+            if column is not None:
+                query = query.order_by(column.desc() if descending else column.asc())
+        else:
+            query = query.order_by(Order.created_at.desc(), Order.id.desc())
+
+        return paginate_query(query, args=filters)
+    except Exception as e:
+        logging.error(f"Failed to retrieve own orders: {str(e)}")
+        return None
+
+
 def get_order_by_id(order_id, jwt_user_id, roles):
     """
     Get a single order by ID with ownership/role check.

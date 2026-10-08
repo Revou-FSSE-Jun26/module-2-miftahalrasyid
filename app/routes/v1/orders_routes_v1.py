@@ -2,7 +2,7 @@ from flask.views import MethodView
 from flask import jsonify, request
 from flask_smorest import Blueprint, abort
 from app.schemas import OrderSchema, OrderUpdateSchema, DeleteActionSchema, OrderItemSchema, OrderErrorExamples, OrderQueryArgs
-from app.services.order_service import get_all_orders, get_order_by_id, create_order, update_order, delete_order, get_order_items
+from app.services.order_service import get_all_orders, get_my_placed_orders, get_order_by_id, create_order, update_order, delete_order, get_order_items
 from app.services import ValidationResponse
 from app.models import UserRole
 from app.services.auth_service import roles_required
@@ -85,6 +85,46 @@ class OrdersRoot(MethodView):
             return jsonify({"success": True, "message": "Order created successfully", "data": order_dict}), 201
         else:
             return jsonify({"success": False, "message": "Failed to create order"}), 400
+
+
+@order_bp.route('/mine')
+class OrdersMine(MethodView):
+
+    @order_bp.doc(security=[{"BearerAuth": []}], responses={
+        "401": {"description": "Missing or invalid JWT token"},
+        "403": {"description": "Insufficient permissions"},
+    })
+    @order_bp.arguments(OrderQueryArgs, location="query")
+    @order_bp.response(200, OrderSchema(many=True))
+    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    def get(self, query_args):
+        """
+        Orders the caller personally placed (user_id == me), regardless of role.
+        Lets a seller/admin see their own purchases (the buyer "My Orders" view),
+        distinct from GET /orders/ which widens to incoming/all for those roles.
+        """
+        jwt_user_id = get_jwt_identity()
+
+        result = get_my_placed_orders(jwt_user_id, query_args)
+        if result is None:
+            return jsonify({"success": False, "message": "Failed to retrieve orders"}), 400
+
+        data = []
+        for order in result["items"]:
+            order_dict = order.to_dict()
+            order_dict["items"] = get_order_items(order.id)
+            data.append(order_dict)
+
+        return jsonify({
+            "success": True,
+            "message": "Get my orders successful",
+            "data": data,
+            "pagination": {
+                "page": result["page"],
+                "per_page": result["per_page"],
+                "total": result["count"],
+            }
+        }), 200
 
 
 @order_bp.route('/<int:id>')
