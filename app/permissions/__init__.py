@@ -144,6 +144,35 @@ FIELD_PERMISSIONS = {
             "delete": "soft",
         },
     },
+    # --- Cart lines (private per-user). Buyer/seller manage their own cart;
+    # admin/superadmin may read for support. user_id/seller_product_id are set
+    # by the service from the JWT + path, never from arbitrary client fields. ---
+    "cart_items": {
+        "SUPERADMIN": {
+            "create": set(),
+            "read":   {"id", "user_id", "seller_product_id", "quantity", "created_at", "updated_at"},
+            "update": set(),
+            "delete": "hard",
+        },
+        "ADMIN": {
+            "create": set(),
+            "read":   {"id", "user_id", "seller_product_id", "quantity", "created_at", "updated_at"},
+            "update": set(),
+            "delete": None,
+        },
+        "SELLER": {
+            "create": {"seller_product_id", "quantity"},
+            "read":   {"id", "seller_product_id", "quantity", "created_at", "updated_at"},
+            "update": {"quantity"},
+            "delete": "hard",
+        },
+        "BUYER": {
+            "create": {"seller_product_id", "quantity"},
+            "read":   {"id", "seller_product_id", "quantity", "created_at", "updated_at"},
+            "update": {"quantity"},
+            "delete": "hard",
+        },
+    },
     "uploads": {
         "SUPERADMIN": {
             "create": {"products", "seller_products"},

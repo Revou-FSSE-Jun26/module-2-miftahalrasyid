@@ -88,7 +88,7 @@ def create_app():
 
     # CRUCIAL: Import all model files here so Alembic detects them
     with app.app_context():
-        from app.models import User, Product, SellerProduct, Order, Category, category_items, Order_item, Profile, Address
+        from app.models import User, Product, SellerProduct, Order, Category, category_items, Order_item, CartItem, Profile, Address
         try:
             db.session.execute(db.text('SELECT 1'))
             print("Database connection: OK")
@@ -96,7 +96,7 @@ def create_app():
             print(f"Connection failed: {e}")
 
     # --- Register Smorest Blueprints (imported inside function to prevent circular imports) ---
-    from app.routes import product_bp, seller_products_bp, users_bp, order_bp, auth_bp, category_bp
+    from app.routes import product_bp, seller_products_bp, users_bp, order_bp, cart_bp, auth_bp, category_bp
     from app.routes.v1.upload_routes_v1 import upload_bp
     from app.routes.v1.admin_routes_v1 import admin_bp
     from app.routes.v1.payment_routes_v1 import payment_bp
@@ -106,6 +106,7 @@ def create_app():
     api.register_blueprint(product_bp)
     api.register_blueprint(seller_products_bp)
     api.register_blueprint(order_bp)
+    api.register_blueprint(cart_bp)
     api.register_blueprint(category_bp)
     api.register_blueprint(upload_bp)
     api.register_blueprint(admin_bp)
