@@ -25,6 +25,22 @@ def _pay_ref(order_id):
     return f"ORDER-{order_id}-{SEED_PAYMENT_TS + order_id}"
 
 
+def _seed_email(email):
+    """
+    Mirror the app's Gmail normalization (user_service.normalize_and_validate_email)
+    WITHOUT the DNS deliverability check, so seeded emails match what login looks
+    up. Gmail/googlemail: strip '+suffix' and all dots from the local part.
+    Without this, a dotted seed like 'siti.nurhaliza@gmail.com' is unreachable
+    because login normalizes the input to 'sitinurhaliza@gmail.com'.
+    """
+    if not email or "@" not in email:
+        return email
+    local, domain = email.strip().lower().split("@", 1)
+    if domain in ("gmail.com", "googlemail.com"):
+        local = local.split("+")[0].replace(".", "")
+    return f"{local}@{domain}"
+
+
 logging.basicConfig(level=logging.INFO)
 
 
@@ -160,6 +176,10 @@ def seed_database():
                     provider=AuthProvider.PASSWORD_HASH, provider_key=_seed_hash(),
                     username="unverifieduser", roles=[UserRole.BUYER]),
           ]
+          # Normalize Gmail addresses the same way login does, so seeded users
+          # (e.g. siti.nurhaliza@gmail.com) are reachable via the normalizing login.
+          for u in users:
+               u.email = _seed_email(u.email)
           db.session.add_all(users)
           db.session.flush()
           logging.info(f"Users seeded: {len(users)} records.")
