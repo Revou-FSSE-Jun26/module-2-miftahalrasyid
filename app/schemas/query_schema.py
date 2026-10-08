@@ -86,6 +86,13 @@ class SellerProductQueryArgs(SanitizeMixin, PaginationQueryArgs):
         load_default=None,
         metadata={"description": "Only listings whose catalog product is in this category id.", "example": 1},
     )
+    category_name = ma.fields.Str(
+        load_default=None,
+        metadata={
+            "description": "Only listings whose catalog product is in a category whose name contains this text (case-insensitive partial match).",
+            "example": "electronics",
+        },
+    )
     min_price = ma.fields.Decimal(
         load_default=None,
         validate=ma.validate.Range(min=0),

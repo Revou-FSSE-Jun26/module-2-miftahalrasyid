@@ -116,6 +116,12 @@ def browse_listings(filters=None, roles=None):
         if category_id:
             query = query.filter(Product.categories.any(Category.id == category_id))
 
+        category_name = filters.get("category_name")
+        if category_name:
+            query = query.filter(
+                Product.categories.any(Category.name.ilike(f"%{category_name}%"))
+            )
+
         if filters.get("min_price") is not None:
             query = query.filter(SellerProduct.price >= filters["min_price"])
         if filters.get("max_price") is not None:
