@@ -242,7 +242,7 @@ def oauth_google_login(token, age):
     # Check if user already exists
     user = User.query.filter_by(email=google_email).first()
 
-    if user:
+    if user and user.age is not None:
         # Existing user — check if soft-deleted
         if user.deleted_at is not None:
             return ValidationResponse(success=False, message="This account has been deactivated.")
@@ -259,7 +259,13 @@ def oauth_google_login(token, age):
             "is_active": user.is_active,
             "message": "Login successful via Google."
         }
-
+    if not age:
+        return{
+            "success": False,
+            "is_profile_complete": True,
+            "registration_step":"NEED_AGE",
+            "message": "Authentication successful, but age is required to complete registration."
+        }
     # New user — register via OAuth
     try:
         username = google_email.split('@')[0]

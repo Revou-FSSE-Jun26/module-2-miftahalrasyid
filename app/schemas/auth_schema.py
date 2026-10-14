@@ -63,7 +63,8 @@ class OAuthGoogleSchema(SanitizeMixin, ma.Schema):
         error_messages={"required": "Google ID token is not provided."}
     )
     age = ma.fields.Int(
-        required=True,
+        required=False,
+        load_default=None,
         validate=ma.validate.Range(min=18, error="You must be at least 18 years old."),
         error_messages={
             "required": "Age is not provided.",
