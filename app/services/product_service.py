@@ -26,7 +26,7 @@ def _catalog_has_active_listing_subquery():
         .filter(
             SellerProduct.deleted_at.is_(None),
             SellerProduct.status == ProductStatus.ACTIVE,
-            SellerProduct.stock > 0,
+            # SellerProduct.stock > 0,
         )
     )
 

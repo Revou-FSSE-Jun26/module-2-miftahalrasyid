@@ -98,7 +98,7 @@ def browse_listings(filters=None, roles=None):
                 Product.deleted_at.is_(None),
                 SellerProduct.deleted_at.is_(None),
                 SellerProduct.status == ProductStatus.ACTIVE,
-                SellerProduct.stock > 0,
+                # SellerProduct.stock > 0,
             )
         )
 
