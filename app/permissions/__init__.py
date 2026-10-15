@@ -38,14 +38,14 @@ FIELD_PERMISSIONS = {
         "SUPERADMIN": {
             "create": {"name", "created_at", "deleted_at"},
             "read":   {"id", "name", "created_at", "deleted_at"},
-            "read_list": {"name", "created_at", "deleted_at"},
+            "read_list": {"id", "name", "created_at", "deleted_at"},
             "update": {"name", "deleted_at"},
             "delete": "hard",
         },
         "ADMIN": {
             "create": {"name", "created_at", "deleted_at"},
             "read":   {"id", "name", "created_at", "deleted_at"},
-            "read_list": {"name", "created_at", "deleted_at"},
+            "read_list": {"id", "name", "created_at", "deleted_at"},
             "update": {"name", "deleted_at"},
             "delete": "soft",
         },

@@ -6,7 +6,7 @@ from app.services import get_all_categories, get_category_by_id, create_category
 from app.models import UserRole
 from app.services.auth_service import roles_required
 from app.permissions.field_filter import get_allowed_fields
-from flask_jwt_extended import get_jwt
+from flask_jwt_extended import get_jwt, jwt_required
 
 category_bp = Blueprint(
     'categories',
@@ -15,22 +15,24 @@ category_bp = Blueprint(
     description='Category Data Operations'
 )
 
-
 @category_bp.route('/')
 class CategoriesRoot(MethodView):
 
-    @category_bp.doc(responses={
+    @category_bp.doc(security=[{"BearerAuth": []}, {}],responses={
         "400": {"description": "Business logic validation failed"},
     })
     @category_bp.arguments(CategoryQueryArgs, location="query")
     @category_bp.response(200, CategorySchema(many=True))
+    @jwt_required(optional=True)
     def get(self, query_args):
         """Retrieve all categories. Supports pagination, search and sorting."""
         result = get_all_categories(query_args)
         if result is None:
             return jsonify({"success": False, "message": "Failed to retrieve categories"}), 400
 
-        # Default read fields for unauthenticated users (same as buyer)
+        # Default read fields for unauthenticated users (same as buyer).
+        # @jwt_required(optional=True) above has already parsed the token (if any),
+        # so get_jwt() returns the claims for an authed admin and {} otherwise.
         allowed = {"name", "created_at"}
 
         try:
@@ -45,7 +47,6 @@ class CategoriesRoot(MethodView):
             {k: v for k, v in cat.__dict__.items() if k in allowed and not k.startswith('_')}
             for cat in result["items"]
         ]
-
         return jsonify({
             "success": True,
             "message": "Get all categories successful",
