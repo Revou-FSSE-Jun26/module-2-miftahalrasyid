@@ -231,7 +231,6 @@ def oauth_google_login(token, age):
         google_email = idinfo.get("email")
         google_sub = idinfo.get("sub")  # Unique Google user ID
         google_name = idinfo.get("name", "")
-
         if not google_email:
             return ValidationResponse(success=False, message="Google ID token does not contain an email.")
 
@@ -242,12 +241,10 @@ def oauth_google_login(token, age):
     # Check if user already exists
     user = User.query.filter_by(email=google_email).first()
 
-    if user and user.age is not None:
-        # Existing user — check if soft-deleted
+    if user:
         if user.deleted_at is not None:
             return ValidationResponse(success=False, message="This account has been deactivated.")
 
-        # Login existing OAuth user
         access_token = generate_token(user)
         refresh_token = generate_refresh_token(user)
         return {
@@ -259,11 +256,11 @@ def oauth_google_login(token, age):
             "is_active": user.is_active,
             "message": "Login successful via Google."
         }
-    if not age:
-        return{
+    if not age or age == "" or age == 0:
+        return {
             "success": False,
-            "is_profile_complete": True,
-            "registration_step":"NEED_AGE",
+            "is_profile_complete": False,
+            "registration_step": "NEED_AGE", # ⬅️ これが Next.js 側に届く必要があります！
             "message": "Authentication successful, but age is required to complete registration."
         }
     # New user — register via OAuth
@@ -408,7 +405,7 @@ def send_verification_email(user):
     """
     email_user = os.environ.get("EMAIL_USER")
     email_pass = os.environ.get("EMAIL_PASS")
-    base_url = os.environ.get("BASE_URL")
+    base_url = os.environ.get("FRONTEND_BASE_URL")
 
     if not email_user or not email_pass:
         logging.error("EMAIL_USER or EMAIL_PASS not configured in .env")
@@ -424,7 +421,7 @@ def send_verification_email(user):
 
     # Generate confirmation token
     token = generate_email_confirmation_token(user)
-    confirmation_url = f"{base_url}/api/v1/auth/email_confirmation?token={token}"
+    confirmation_url = f"{base_url}/auth/verify-email?token={token}"
 
     # Build email
     msg = MIMEMultipart("alternative")

@@ -86,6 +86,9 @@ class TokenResponseSchema(ma.Schema):
     username = ma.fields.Str(required=True, metadata={"example": "rafaelalun"})
     is_active = ma.fields.Bool(required=True, metadata={"example": False})
     message = ma.fields.Str(required=True, metadata={"example": "Registration successful. Please verify your email."})
+    success = ma.fields.Bool(required=False, metadata={"example": False})
+    registration_step = ma.fields.Str(required=False, metadata={"example": "NEED_AGE", "description": "Present if frontend needs to show additional steps like age form."})
+    id_token = ma.fields.Str(required=False, metadata={"example": "ya29.a0AX..."})
 
 
 class RefreshResponseSchema(ma.Schema):

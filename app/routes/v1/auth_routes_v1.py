@@ -1,5 +1,5 @@
 from flask.views import MethodView
-from flask import request
+from flask import request, jsonify
 from flask_smorest import Blueprint, abort
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.schemas import (
@@ -235,9 +235,9 @@ class AuthOAuthGoogle(MethodView):
         """
         result = oauth_google_login(
             token=data["id_token"],
-            age=data["age"]
+            age=data.get("age")
         )
-
+        # ⬆️ 【ここまで追加】 ⬆️
         if isinstance(result, ValidationResponse):
             abort(400, message=result.message)
 
