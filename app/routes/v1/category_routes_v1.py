@@ -7,7 +7,7 @@ from app.models import UserRole
 from app.services.auth_service import roles_required
 from app.permissions.field_filter import get_allowed_fields
 from flask_jwt_extended import get_jwt, jwt_required
-
+import logging
 category_bp = Blueprint(
     'categories',
     __name__,
@@ -40,6 +40,7 @@ class CategoriesRoot(MethodView):
             if jwt_data and jwt_data.get("roles"):
                 roles = jwt_data["roles"]
                 allowed = get_allowed_fields("categories", roles, "read_list")
+                logging.info(f"roles: {roles}")
         except Exception:
             pass
 
