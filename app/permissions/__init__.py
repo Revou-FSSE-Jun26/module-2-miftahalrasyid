@@ -52,7 +52,7 @@ FIELD_PERMISSIONS = {
         "SELLER": {
             "create": set(),
             "read":   {"id", "name", "created_at"},
-            "read_list": {"name", "created_at"},
+            "read_list": {"id","name", "created_at"},
             "update": set(),
             "delete": None,
         },

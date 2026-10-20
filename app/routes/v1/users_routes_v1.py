@@ -5,6 +5,7 @@ from flask_jwt_extended import get_jwt_identity, get_jwt
 from app.services.auth_service import roles_required
 from app.models import UserRole
 from app.schemas import UserSchema, UserCreateSchema, UserUpdateFormSchema, UserUpdateSuccessResponseSchema, BecomeSellerResponseSchema, UserErrorExamples, DeleteActionSchema, ProfileUpdateSchema, UserQueryArgs
+from app.schemas.address_schema import AddressSchema, AddressUpdateSchema
 from app.permissions.field_filter import get_delete_policy
 from app.services.user_service import (
     get_all_users,
@@ -52,7 +53,7 @@ class UsersRoot(MethodView):
 
     @users_bp.doc(responses=UserErrorExamples.RESPONSES_POST_USER, security=[{"BearerAuth": []}])
     @users_bp.arguments(UserCreateSchema, location="json")
-    @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
+    @roles_required(UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
     @users_bp.response(201, UserSchema)
     def post(self, user_instance):
         """Add a new user to the database"""
@@ -262,21 +263,14 @@ class UserMeAddresses(MethodView):
         "401": {"description": "Missing or invalid JWT token"},
         "422": {"description": "Input validation failed"},
     })
+    @users_bp.arguments(AddressSchema, location="json")
     @users_bp.response(201)
     @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
-    def post(self):
+    def post(self, address_instance):
         """Create a new address for the authenticated user."""
-        from app.schemas import AddressSchema
         from app.services.address_service import create_address
-        from marshmallow import ValidationError
 
         current_user_id = int(get_jwt_identity())
-        schema = AddressSchema()
-
-        try:
-            address_instance = schema.load(request.json)
-        except ValidationError as err:
-            abort(422, message=err.messages)
 
         result = create_address(current_user_id, address_instance)
 
@@ -313,21 +307,14 @@ class UserMeAddressDetail(MethodView):
         "404": {"description": "Address not found or does not belong to you"},
         "422": {"description": "Input validation failed"},
     })
+    @users_bp.arguments(AddressUpdateSchema, location="json")
     @users_bp.response(200)
     @roles_required(UserRole.BUYER.value, UserRole.SELLER.value, UserRole.ADMIN.value, UserRole.SUPERADMIN.value)
-    def put(self, address_id):
+    def put(self, update_data, address_id):
         """Update a specific address for the authenticated user."""
-        from app.schemas import AddressUpdateSchema
         from app.services.address_service import update_address
-        from marshmallow import ValidationError
 
         current_user_id = int(get_jwt_identity())
-        schema = AddressUpdateSchema()
-
-        try:
-            update_data = schema.load(request.json)
-        except ValidationError as err:
-            abort(422, message=err.messages)
 
         result = update_address(address_id, current_user_id, update_data)
 
