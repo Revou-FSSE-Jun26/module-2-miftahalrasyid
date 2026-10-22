@@ -80,7 +80,7 @@ def seed_database():
                # --- Admin ---
                User(id=2, email="mike@gmail.com", age=30, is_active=True,
                     provider=AuthProvider.PASSWORD_HASH, provider_key=_seed_hash(),
-                    username="mike", roles=[UserRole.BUYER, UserRole.ADMIN]),
+                    username="mike", roles=[UserRole.ADMIN]),
                # --- Sellers ---
                User(id=3, email="justin@gmail.com", age=28, is_active=True,
                     provider=AuthProvider.PASSWORD_HASH, provider_key=_seed_hash(),
