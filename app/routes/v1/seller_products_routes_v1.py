@@ -56,16 +56,18 @@ class SellerProductsRoot(MethodView):
         """
         _, roles = _optional_identity()
         result = browse_listings(query_args, roles=roles)
+        
         if result is None:
             return jsonify({"success": False, "message": "Failed to retrieve listings"}), 400
+        
+        clean_items = result.pop("items", [])
+        
         return jsonify({
             "success": True,
             "message": "get all listings successful",
-            "data": result["items"],
+            "data": clean_items, # Menggunakan data produk yang sudah dipisahkan
             "pagination": {
-                "page": result["page"],
-                "per_page": result["per_page"],
-                "total": result["count"],
+                **result # 🌟 SEKARANG AMAN: Hanya berisi page, per_page, total, total_pages, dan COUNT!
             }
         }), 200
 
@@ -111,11 +113,9 @@ class SellerProductsMine(MethodView):
         return jsonify({
             "success": True,
             "message": "get my listings successful",
-            "data": [sp.to_dict(allowed_fields=allowed) for sp in result["items"]],
+            "data": [sp.to_dict(allowed_fields=allowed) for sp in result.pop("items",[])],
             "pagination": {
-                "page": result["page"],
-                "per_page": result["per_page"],
-                "total": result["count"],
+               **result
             }
         }), 200
 

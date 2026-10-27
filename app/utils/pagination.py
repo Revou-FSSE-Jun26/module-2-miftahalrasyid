@@ -1,5 +1,5 @@
 from flask import request
-
+import math
 
 def paginate_query(query, max_per_page=30, default_per_page=10, args=None):
     """
@@ -45,12 +45,15 @@ def paginate_query(query, max_per_page=30, default_per_page=10, args=None):
         per_page = max_per_page
 
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    total_items = pagination.total or 0
+    # Rumus: Jika total data > 0, bulatkan ke atas hasil bagi (total / per_page). Jika 0, maka 1 halaman.
+    total_pages = math.ceil(total_items / per_page) if total_items > 0 else 1
 
     return {
         "items": pagination.items,
         "page": pagination.page,
         "per_page": pagination.per_page,
-        "total": pagination.total,
-        "pages": pagination.pages,
+        "total": total_items,
+        "pages": total_pages,
         "count": len(pagination.items),
     }

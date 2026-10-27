@@ -97,11 +97,9 @@ class AdminProducts(MethodView):
         return jsonify({
             "success": True,
             "message": "All products (admin view)",
-            "data": [p.to_dict() for p in result["items"]],
+            "data": [p.to_dict() for p in result.pop("items",[])],
             "pagination": {
-                "page": result["page"],
-                "per_page": result["per_page"],
-                "total": result["count"],
+                **result
             }
         }), 200
 
@@ -127,7 +125,7 @@ class AdminUserOrders(MethodView):
         result = paginate_query(query, args=query_args)
 
         data = []
-        for order in result["items"]:
+        for order in result.pop("items",[]):
             order_dict = order.to_dict()
             order_dict["items"] = get_order_items(order.id)
             data.append(order_dict)
@@ -137,9 +135,7 @@ class AdminUserOrders(MethodView):
             "message": f"Orders for user {user_id}",
             "data": data,
             "pagination": {
-                "page": result["page"],
-                "per_page": result["per_page"],
-                "total": result["count"],
+                **result
             }
         }), 200
 
@@ -271,11 +267,9 @@ class AdminCategoryProducts(MethodView):
         return jsonify({
             "success": True,
             "message": f"All products in category '{category.name}' (admin view)",
-            "data": [p.to_dict() for p in result["items"]],
+            "data": [p.to_dict() for p in result.pop("items",[])],
             "pagination": {
-                "page": result["page"],
-                "per_page": result["per_page"],
-                "total": result["count"],
+               **result
             }
         }), 200
 

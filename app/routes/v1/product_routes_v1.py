@@ -46,15 +46,13 @@ class ProductsRoot(MethodView):
         result = get_all_products(query_args, jwt_user_id=jwt_user_id, roles=roles)
         if result is None:
             return jsonify({"success": False, "message": "Failed to retrieve products"}), 400
-        
+        data = result.pop("items",[])
         return jsonify({
             "success": True,
             "message": "get all products successful",
-            "data": [p.to_dict() for p in result["items"]],
+            "data": [p.to_dict() for p in data],
             "pagination": {
-                "page": result["page"],
-                "per_page": result["per_page"],
-                "total": result["count"],
+                **result
             }
         }), 200
 

@@ -50,9 +50,7 @@ class CartRoot(MethodView):
             "data": result["items"],
             "summary": result["summary"],
             "pagination": {
-                "page": result["page"],
-                "per_page": result["per_page"],
-                "total": result["count"],
+                **result
             },
         }), 200
 

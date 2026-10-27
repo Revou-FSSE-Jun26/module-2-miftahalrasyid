@@ -39,7 +39,7 @@ class OrdersRoot(MethodView):
         # Filter fields by role
         allowed = get_allowed_fields("orders", roles, "read")
         data = []
-        for order in result["items"]:
+        for order in result.pop("items",[]):
             order_dict = order.to_dict()
             filtered = {k: v for k, v in order_dict.items() if k in allowed}
             filtered["items"] = get_order_items(order.id)
@@ -50,9 +50,7 @@ class OrdersRoot(MethodView):
             "message": "Get orders successful",
             "data": data,
             "pagination": {
-                "page": result["page"],
-                "per_page": result["per_page"],
-                "total": result["count"],
+                **result
             }
         }), 200
 
@@ -109,20 +107,20 @@ class OrdersMine(MethodView):
         if result is None:
             return jsonify({"success": False, "message": "Failed to retrieve orders"}), 400
 
-        data = []
-        for order in result["items"]:
-            order_dict = order.to_dict()
-            order_dict["items"] = get_order_items(order.id)
-            data.append(order_dict)
+        raw_items = result.pop("items", [])
+        
+        # Menggunakan list comprehension yang valid di Python
+        data = [
+            order.to_dict() | {"items": get_order_items(order.id)}
+            for order in raw_items
+        ]
 
         return jsonify({
             "success": True,
             "message": "Get my orders successful",
             "data": data,
             "pagination": {
-                "page": result["page"],
-                "per_page": result["per_page"],
-                "total": result["count"],
+               **result
             }
         }), 200
 

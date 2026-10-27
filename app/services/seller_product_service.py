@@ -163,17 +163,15 @@ def browse_listings(filters=None, roles=None):
 
         page = paginate_query(query, args=filters)
 
-        items = []
-        for row in page["items"]:
-            sp, mp = row  # (SellerProduct, min_price)
-            data = sp.to_dict(allowed_fields=listing_fields)
-            catalog = sp.catalog.to_dict(allowed_fields=catalog_fields) if sp.catalog else {}
-            # Merge catalog spec, keep listing keys authoritative.
-            merged = {**catalog, **data}
-            merged["seller_product_id"] = sp.id
-            merged["min_price"] = float(mp) if mp is not None else None
-            items.append(merged)
-        page["items"] = items
+        page["items"] = [
+            {
+                **(sp.catalog.to_dict(allowed_fields=catalog_fields) if sp.catalog else {}),
+                **sp.to_dict(allowed_fields=listing_fields),
+                "seller_product_id": sp.id,
+                "min_price": float(mp) if mp is not None else None
+            }
+            for sp, mp in page["items"]
+        ]
         return page
     except Exception as e:
         logging.error(f"Failed to browse listings: {str(e)}")

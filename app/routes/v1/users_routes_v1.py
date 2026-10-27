@@ -40,14 +40,13 @@ class UsersRoot(MethodView):
         result = get_all_users(query_args, caller_roles)
         if result is None:
             abort(500, message="Failed to retrieve data from database.")
+        data = result.pop("items", [])
         return jsonify({
             "success": True,
             "message": "show all users successful",
-            "data": [user.to_dict() for user in result["items"]],
+            "data": [user.to_dict() for user in data],
             "pagination": {
-                "page": result["page"],
-                "per_page": result["per_page"],
-                "total": result["count"],
+               **result
             }
         }), 200
 

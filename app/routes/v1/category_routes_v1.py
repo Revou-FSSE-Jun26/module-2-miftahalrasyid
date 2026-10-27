@@ -7,7 +7,7 @@ from app.models import UserRole
 from app.services.auth_service import roles_required
 from app.permissions.field_filter import get_allowed_fields
 from flask_jwt_extended import get_jwt, jwt_required
-import logging
+# import logging
 category_bp = Blueprint(
     'categories',
     __name__,
@@ -40,22 +40,22 @@ class CategoriesRoot(MethodView):
             if jwt_data and jwt_data.get("roles"):
                 roles = jwt_data["roles"]
                 allowed = get_allowed_fields("categories", roles, "read_list")
-                logging.info(f"roles: {roles}")
+                # logging.info(f"roles: {roles}")
         except Exception:
             pass
+        raw_items = result.pop("items", [])
 
+        # 2. Lakukan perulangan allowed keys dari data yang sudah bersih
         data = [
             {k: v for k, v in cat.__dict__.items() if k in allowed and not k.startswith('_')}
-            for cat in result["items"]
+            for cat in raw_items
         ]
         return jsonify({
             "success": True,
             "message": "Get all categories successful",
             "data": data,
             "pagination": {
-                "page": result["page"],
-                "per_page": result["per_page"],
-                "total": result["count"],
+               **result
             }
         }), 200
 

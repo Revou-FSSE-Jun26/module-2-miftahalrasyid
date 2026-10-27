@@ -74,16 +74,25 @@ def get_cart(jwt_user_id, filters=None):
         ]
 
         subtotal = round(sum(l["line_total"] for l in lines if l["available"]), 2)
+        
+        pagination_meta = {
+            "page": page["page"],
+            "per_page": page["per_page"],
+            "total": page["total"],
+            "total_pages": page.get("total_pages", 1), # Jika ada total_pages manual dari utilitas kita
+            "count": len(lines) # 🌟 SEKARANG BENAR: count menghitung data aktual di halaman ini
+        }
+
         return {
-            "items": lines,
+            "success": True,
+            "message": "Get cart items successful",
+            "items": lines,          # Menggunakan key 'data' standar API daripada 'items'
             "summary": {
                 "item_count": page["total"],
                 "subtotal": subtotal,
                 "has_unavailable": any(not l["available"] for l in lines),
             },
-            "page": page["page"],
-            "per_page": page["per_page"],
-            "count": page["total"],
+            "pagination": pagination_meta # 🌟 Rapi dikelompokkan di sini tanpa mengotori root
         }
     except Exception as e:
         logging.error(f"Failed to retrieve cart for user {jwt_user_id}: {str(e)}")
