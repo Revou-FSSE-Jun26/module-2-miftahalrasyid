@@ -10,6 +10,7 @@ from app.services.seller_product_service import (
     browse_listings,
     get_my_listings,
     get_listing_by_id,
+    get_listing_by_slug,
     create_listing,
     update_listing,
     delete_listing,
@@ -118,6 +119,31 @@ class SellerProductsMine(MethodView):
                **result
             }
         }), 200
+@seller_products_bp.route('/slug/<string:slug>')
+class SellerProductBySlug(MethodView):
+    @seller_products_bp.response(200, SellerProductSchema)
+    def get(self, slug):
+        """Retrieve a single listing by Slug """
+        jwt_user_id,roles = _optional_identity()
+        listing = get_listing_by_slug(slug,jwt_user_id=jwt_user_id, roles=roles)
+        if not listing:
+            abort(404,message="Listing is not found")
+            
+        data = listing.to_dict()
+        if listing.catalog:
+            data.update({
+                "brand": listing.catalog.brand,
+                "name": listing.catalog.name,
+                "description": listing.catalog.description,
+                "model": listing.catalog.model,
+                "color": listing.catalog.color,
+                "size": listing.catalog.size,
+                "categories": [c.name for c in listing.catalog.categories],
+            })
+        if listing.seller:
+            data["seller_name"] = listing.seller.username
+        return jsonify({"success": True, "message": "get listing detail by slug successful", "data": data}), 200
+    
 
 
 @seller_products_bp.route('/<int:id>')

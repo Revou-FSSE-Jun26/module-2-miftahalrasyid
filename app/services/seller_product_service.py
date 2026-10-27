@@ -222,6 +222,27 @@ def get_my_listings(filters=None, jwt_user_id=None, roles=None):
         logging.error(f"Failed to retrieve listings: {str(e)}")
         return None
 
+def get_listing_by_slug(listing_slug, jwt_user_id=None,roles=None):
+    """
+    Show listing detail for all people whether the user authenticated or no.
+    catalog product is live. 
+    """
+    try:
+        listing = SellerProduct.query.filter(
+            SellerProduct.slug == listing_slug,
+            SellerProduct.deleted_at.is_(None),
+        ).first()
+        if not listing:
+            return None
+        if listing.status == ProductStatus.ACTIVE and listing.catalog and listing.catalog.deleted_at is None:
+            return listing
+        is_owner = jwt_user_id is not None and listing.user_id == int(jwt_user_id)
+        if _is_admin(roles) or is_owner:
+            return listing
+        return None
+    except Exception as er:
+        logging.error(f"Failed to retrieve listing {listing_slug}:{str(er)}")
+    return None
 
 def get_listing_by_id(listing_id, jwt_user_id=None, roles=None):
     """
